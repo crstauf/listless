@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "listless",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-19",
+
+  // Listless stores nothing. There are deliberately no KV, D1, R2, Durable
+  // Object or other bindings; test/storage.test.ts fails if any are added.
+
+  // No logs or traces of requests are kept.
+  "observability": {
+    "enabled": false
+  }
+}
