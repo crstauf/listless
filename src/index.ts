@@ -1,9 +1,21 @@
+import { docs } from "./docs";
 import { LIMITS, encodeList, parseList } from "./link";
 import { PAGE_CSP, PAGE_HTML } from "./page.generated";
 
 export default {
 	async fetch(request): Promise<Response> {
 		const url = new URL(request.url);
+
+		if (url.pathname === "/") {
+			if (request.method !== "GET" && request.method !== "HEAD") return methodNotAllowed("GET, HEAD");
+			return new Response(docs(url.origin), {
+				headers: {
+					"content-type": "text/plain; charset=utf-8",
+					"x-content-type-options": "nosniff",
+					"cache-control": "public, max-age=300",
+				},
+			});
+		}
 
 		if (url.pathname === "/api/lists") {
 			if (request.method !== "POST") return methodNotAllowed("POST");
