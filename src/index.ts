@@ -1,4 +1,5 @@
 import { LIMITS, encodeList, parseList } from "./link";
+import { PAGE_CSP, PAGE_HTML } from "./page.generated";
 
 export default {
 	async fetch(request): Promise<Response> {
@@ -7,6 +8,12 @@ export default {
 		if (url.pathname === "/api/lists") {
 			if (request.method !== "POST") return methodNotAllowed("POST");
 			return createLink(request, url.origin);
+		}
+
+		if (url.pathname === "/l" || url.pathname.startsWith("/l/")) {
+			if (request.method !== "GET" && request.method !== "HEAD") return methodNotAllowed("GET, HEAD");
+			if (!/^\/l\/([A-Za-z0-9_-]+)?$/.test(url.pathname)) return Response.redirect(`${url.origin}/l/`, 302);
+			return page();
 		}
 
 		return new Response("Not found\n", { status: 404 });
@@ -34,6 +41,21 @@ async function createLink(request: Request, origin: string): Promise<Response> {
 
 	const fragment = await encodeList(result.list);
 	return json({ url: `${origin}/l/#${fragment}` }, 201);
+}
+
+// The same static page serves every list. The list itself is in the URL
+// fragment or the browser's localStorage, neither of which reaches this Worker.
+function page(): Response {
+	return new Response(PAGE_HTML, {
+		headers: {
+			"content-type": "text/html; charset=utf-8",
+			"content-security-policy": PAGE_CSP,
+			"referrer-policy": "no-referrer",
+			"x-content-type-options": "nosniff",
+			"permissions-policy": "camera=(), microphone=(), geolocation=()",
+			"cache-control": "public, max-age=300",
+		},
+	});
 }
 
 function tooLarge(): Response {
