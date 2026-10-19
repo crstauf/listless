@@ -18,10 +18,12 @@
 		<div class="progress-row">
 			<p id="progress-text" aria-live="polite"></p>
 			<div class="actions">
-				<button type="button" id="copy">Copy as Markdown</button>
-				<button type="button" id="toggle-done" aria-pressed="false">Hide completed</button>
-				<button type="button" id="reset">Reset</button>
-				<button type="button" id="delete" class="danger">Delete</button>
+				<button type="button" id="copy" aria-label="Copy as Markdown"><span class="label">Copy as Markdown</span></button>
+				<button type="button" id="toggle-done" aria-pressed="false"><span class="label">Hide completed</span></button>
+				<button type="button" id="toggle-upcoming" aria-pressed="false" hidden><span class="label">Hide upcoming</span></button>
+				<button type="button" id="toggle-details" aria-pressed="false" hidden><span class="label">Hide details</span></button>
+				<button type="button" id="reset" aria-label="Reset"><span class="label">Reset</span></button>
+				<button type="button" id="delete" class="danger" aria-label="Delete"><span class="label">Delete</span></button>
 			</div>
 		</div>
 	</div>
@@ -30,7 +32,8 @@
 
 <main>
 	<p id="notice" class="notice" hidden></p>
-	<ol id="tasks" class="tasks" hidden></ol>
+	<div id="list" hidden></div>
+	<button type="button" id="upcoming-hidden" class="upcoming-hidden" hidden></button>
 	<p id="all-done" class="all-done" hidden>All done.</p>
 	<section id="message" class="message" hidden>
 		<h1 id="message-title"></h1>

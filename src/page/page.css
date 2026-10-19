@@ -198,8 +198,82 @@ main {
 	text-decoration-thickness: 1px;
 }
 
-.tasks.hide-done .done {
+
+.group + .group {
+	margin-top: 20px;
+}
+
+.group-head {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	padding: 8px 4px;
+}
+
+.group-head h2 {
+	margin: 0;
+	font-size: 0.8125rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.group-count {
+	color: var(--muted);
+	font-size: 0.8125rem;
+	font-variant-numeric: tabular-nums;
+}
+
+.tasks .body {
+	flex: 1;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0 8px;
+}
+
+.tasks .step {
+	color: var(--muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.tasks .details {
+	flex-basis: 100%;
+	color: var(--muted);
+	font-size: 0.9375rem;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.hide-details .details {
 	display: none;
+}
+
+.tasks .upcoming {
+	opacity: 0.55;
+}
+
+.tasks .upcoming label {
+	cursor: not-allowed;
+}
+
+.tasks .current .text {
+	font-weight: 600;
+}
+
+code {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 0.875em;
+	padding: 0.1em 0.35em;
+	border-radius: 6px;
+	background: var(--accent-soft);
+	user-select: all;
+	-webkit-user-select: all;
+	cursor: pointer;
+}
+
+.upcoming-hidden {
+	display: block;
+	margin: 12px auto 0;
 }
 
 .notice {
