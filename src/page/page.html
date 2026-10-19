@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="{{CSP}}">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<title>Listless</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f6f5e'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11.5' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>{{STYLE}}</style>
+</head>
+<body>
+<header class="bar" hidden>
+	<div class="bar-inner">
+		<h1 id="title"></h1>
+		<div class="progress-row">
+			<p id="progress-text" aria-live="polite"></p>
+			<div class="actions">
+				<button type="button" id="copy">Copy as Markdown</button>
+				<button type="button" id="toggle-done" aria-pressed="false">Hide completed</button>
+				<button type="button" id="reset">Reset</button>
+				<button type="button" id="delete" class="danger">Delete</button>
+			</div>
+		</div>
+	</div>
+	<div class="progress-track" aria-hidden="true"><div id="progress-fill"></div></div>
+</header>
+
+<main>
+	<p id="notice" class="notice" hidden></p>
+	<ol id="tasks" class="tasks" hidden></ol>
+	<p id="all-done" class="all-done" hidden>All done.</p>
+	<section id="message" class="message" hidden>
+		<h1 id="message-title"></h1>
+		<p id="message-body"></p>
+	</section>
+</main>
+
+<footer>
+	<p>Stored only in this browser. Nothing on this page is sent anywhere. <a href="/">How Listless works</a></p>
+</footer>
+
+<script>{{SCRIPT}}</script>
+</body>
+</html>
