@@ -34,6 +34,7 @@ The page shows progress overall and per section. Its toolbar has **Copy as Markd
 {
   "v": 1,
   "title": "Ship the release",
+  "description": "From https://claude.ai/chat/…",
   "ordered": true,
   "sections": [
     { "title": "Prepare", "tasks": ["Review the PR", { "text": "Bump the version", "details": "Edit `package.json`." }] },
@@ -43,6 +44,7 @@ The page shows progress overall and per section. Its toolbar has **Copy as Markd
 ```
 
 - **`title`**: optional.
+- **`description`**: optional. It's shown under the title. Web addresses in it become links, so agents can link back to the conversation the list came from.
 - **`ordered`**: optional. When `true`, tasks are done in sequence: only the next unfinished task can be checked off, and the ones after it stay locked. Unchecking a step reopens it and every step after it.
 - **`tasks`**: an array of tasks. A task is a string, or `{ "text", "details" }` when it needs extra explanation. Details show in smaller, muted text, and the reader can hide them.
 - **`sections`**: use this instead of `tasks` to group tasks under headings.
@@ -73,6 +75,7 @@ Limits:
 - Up to 500 tasks in total, and up to 50 sections.
 - Task text up to 1,000 characters, and details up to 2,000.
 - List and section titles up to 200 characters.
+- Description up to 2,000 characters.
 - POST bodies up to 256 KB.
 
 ## Network traffic, exactly
