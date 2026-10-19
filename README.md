@@ -20,13 +20,33 @@ Give an agent a wall of text, let it pull out the tasks, and get back a link to 
    https://<host>/l/#v1.<data>
    ```
 
-   `<data>` is `base64url(deflate-raw(JSON))`, and the JSON is `{"v":1,"title":"…","tasks":["…","…"]}`. Browsers never send the part after `#` to a server.
+   `<data>` is `base64url(deflate-raw(JSON))`, and the JSON is a list such as `{"v":1,"title":"…","tasks":["…","…"]}` (see [List format](#list-format)). Browsers never send the part after `#` to a server.
 
 2. You open the link. The page reads the list from the address, saves it in your browser, and swaps the address for a short one: `https://<host>/l/<id>`. The id is a hash of the list's contents, so opening the same original link again finds the same list and keeps your check marks.
 
 3. You check things off. Everything is saved in your browser as you go.
 
-The page has a progress bar, **Copy as Markdown** (to paste your progress back to an agent), **Hide completed**, **Reset**, and **Delete**.
+The page shows progress overall and per section. Its toolbar has **Copy as Markdown** (to paste your progress back to an agent), **Hide completed**, **Hide upcoming** (ordered lists), **Hide details**, **Uncheck all**, and **Delete**. Clicking a code span selects all of it, ready to copy.
+
+## List format
+
+```json
+{
+  "v": 1,
+  "title": "Ship the release",
+  "ordered": true,
+  "sections": [
+    { "title": "Prepare", "tasks": ["Review the PR", { "text": "Bump the version", "details": "Edit `package.json`." }] },
+    { "title": "Release", "tasks": ["Merge to `main`", "Run `npm publish`"] }
+  ]
+}
+```
+
+- **`title`**: optional.
+- **`ordered`**: optional. When `true`, tasks are done in sequence: only the next unfinished task can be checked off, and the ones after it stay locked. Unchecking a step reopens it and every step after it.
+- **`tasks`**: an array of tasks. A task is a string, or `{ "text", "details" }` when it needs extra explanation. Details show in smaller, muted text, and the reader can hide them.
+- **`sections`**: use this instead of `tasks` to group tasks under headings.
+- **Code:** text is plain, except that `` `backtick` `` spans show as code.
 
 ## For agents
 
@@ -49,7 +69,11 @@ curl -s -X POST https://<host>/api/lists \
 # {"url":"https://<host>/l/#v1.…"}
 ```
 
-Limits: 1–500 tasks, each up to 1,000 characters; an optional title up to 200 characters; POST bodies up to 256 KB. Tasks are plain text.
+Limits:
+- Up to 500 tasks in total, and up to 50 sections.
+- Task text up to 1,000 characters, and details up to 2,000.
+- List and section titles up to 200 characters.
+- POST bodies up to 256 KB.
 
 ## Network traffic, exactly
 
