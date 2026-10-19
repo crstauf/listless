@@ -349,8 +349,6 @@
 		const text = pressed ? pressedLabel : label;
 		button.setAttribute("aria-label", text);
 		button.title = text;
-		const visible = button.querySelector(".label");
-		if (visible) visible.textContent = text;
 	}
 
 	function showMessage(title, body) {
@@ -500,15 +498,12 @@
 		button.setAttribute("aria-label", text);
 		button.title = text;
 		button.classList.add("flash");
-		const visible = button.querySelector(".label");
-		if (visible) visible.textContent = text;
 		clearTimeout(Number(button.dataset.timer));
 		button.dataset.timer = String(
 			setTimeout(() => {
 				button.setAttribute("aria-label", original);
 				button.title = original;
 				button.classList.remove("flash");
-				if (visible) visible.textContent = original;
 			}, 1500),
 		);
 	}

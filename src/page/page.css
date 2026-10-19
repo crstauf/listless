@@ -130,6 +130,53 @@ button.danger {
 	color: var(--danger);
 }
 
+button.icon {
+	display: inline-grid;
+	place-items: center;
+	width: 40px;
+	height: 40px;
+	min-height: 0;
+	padding: 0;
+	border-radius: 50%;
+}
+
+button.icon svg {
+	width: 20px;
+	height: 20px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.75;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+/* Toggles show a strike-through on their icon while they're hiding things. */
+button.icon .slash,
+button.icon .slash-gap,
+button.icon .when-flash {
+	display: none;
+}
+
+button.icon[aria-pressed="true"] .slash,
+button.icon[aria-pressed="true"] .slash-gap {
+	display: inline;
+}
+
+button.icon .slash-gap {
+	stroke: var(--accent-soft);
+	stroke-width: 5;
+}
+
+button.icon.flash .when-idle {
+	display: none;
+}
+
+button.icon.flash .when-flash {
+	display: inline;
+	stroke: var(--accent);
+	stroke-width: 2.25;
+}
+
 button:focus-visible,
 a:focus-visible,
 input:focus-visible {
