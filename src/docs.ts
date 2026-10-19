@@ -67,11 +67,17 @@ Errors return 400 (or 413 for an oversized body) with {"error": "..."}.
     {
       "v": 1,
       "title": "Optional title",
+      "description": "Optional context, e.g. a link back to this conversation",
       "ordered": false,
       "tasks": [ <task>, <task>, ... ]
     }
 
 - title: optional.
+- description: optional. Shown under the title, with line breaks kept. Web
+  addresses (http:// or https://) in it become links, so when you know the
+  address of the conversation the list came from, put it here so the user
+  can get back to it. Write the address bare, not in backticks, so it stays
+  clickable. Keep it to a sentence or two.
 - ordered: optional, default false. In an ordered list, tasks must be done in
   sequence: only the next unfinished task can be checked off, and later ones
   are locked until it is. Use it when order matters (setup steps, a
@@ -101,6 +107,7 @@ Order in an ordered list runs across all sections.
 Text is plain: Markdown and HTML are shown literally, except that \`backticks\`
 mark code. Wrap commands, file names, paths, URLs and identifiers in
 backticks; the user can select a code span with one click to copy it.
+(The exception is a link in "description", which should be left bare.)
 
 ## Limits
 
@@ -108,6 +115,7 @@ backticks; the user can select a code span with one click to copy it.
 - details: at most ${LIMITS.maxDetailsLength} characters
 - sections: 1 to ${LIMITS.maxSections}, each with a title and at least one task
 - titles (list and section): at most ${LIMITS.maxTitleLength} characters
+- description: at most ${LIMITS.maxDescriptionLength} characters
 - POST body: at most ${LIMITS.maxBodyBytes / 1024} KB
 
 ## Giving the link to the user
