@@ -25,6 +25,15 @@ describe("POST /api/lists", () => {
 		}
 	});
 
+	it("keeps a trimmed description, line breaks included, and omits a blank one", async () => {
+		const description = "From https://claude.ai/code/session_123\nSecond line";
+		const { data } = await createLink({ title: "T", description: `  ${description} `, tasks: ["One"] });
+		expect(await decodeList(data.url!.split("#")[1])).toEqual({ v: 1, title: "T", description, tasks: ["One"] });
+
+		const blank = await createLink({ description: "  ", tasks: ["One"] });
+		expect(await decodeList(blank.data.url!.split("#")[1])).toEqual({ v: 1, tasks: ["One"] });
+	});
+
 	it("round-trips ordered lists, sections and task details", async () => {
 		const list = {
 			title: "Ship it",
@@ -69,6 +78,8 @@ describe("POST /api/lists", () => {
 		["a non-string title", JSON.stringify({ title: 1, tasks: ["ok"] })],
 		["too many tasks", JSON.stringify({ tasks: Array(LIMITS.maxTasks + 1).fill("t") })],
 		["a task that is too long", JSON.stringify({ tasks: ["t".repeat(LIMITS.maxTaskLength + 1)] })],
+		["a non-string description", JSON.stringify({ description: ["x"], tasks: ["ok"] })],
+		["a description that is too long", JSON.stringify({ description: "d".repeat(LIMITS.maxDescriptionLength + 1), tasks: ["ok"] })],
 		["a title that is too long", JSON.stringify({ title: "t".repeat(LIMITS.maxTitleLength + 1), tasks: ["ok"] })],
 		["both tasks and sections", JSON.stringify({ tasks: ["ok"], sections: [{ title: "s", tasks: ["ok"] }] })],
 		["empty sections", JSON.stringify({ sections: [] })],

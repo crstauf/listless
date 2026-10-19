@@ -8,6 +8,7 @@ export const LIMITS = {
 	maxTaskLength: 1_000,
 	maxDetailsLength: 2_000,
 	maxTitleLength: 200,
+	maxDescriptionLength: 2_000,
 	maxBodyBytes: 256 * 1024,
 } as const;
 
@@ -25,6 +26,9 @@ export interface Section {
 export type List = {
 	v: 1;
 	title?: string;
+	// Shown under the title. Web addresses in it become links, so it's the
+	// place for a link back to the conversation the list came from.
+	description?: string;
 	ordered?: true;
 } & ({ tasks: Task[] } | { sections: Section[] });
 
@@ -43,9 +47,10 @@ export function parseList(input: unknown): ParseResult {
 
 function toList(input: unknown): List {
 	if (!isObject(input)) throw new InvalidList("Body must be a JSON object.");
-	const { title, ordered, tasks, sections } = input;
+	const { title, description, ordered, tasks, sections } = input;
 
 	const cleanTitle = optionalText(title, "title", LIMITS.maxTitleLength);
+	const cleanDescription = optionalText(description, "description", LIMITS.maxDescriptionLength);
 	if (ordered !== undefined && typeof ordered !== "boolean") {
 		throw new InvalidList('"ordered" must be true or false when present.');
 	}
@@ -56,6 +61,7 @@ function toList(input: unknown): List {
 	const head = {
 		v: 1 as const,
 		...(cleanTitle ? { title: cleanTitle } : {}),
+		...(cleanDescription ? { description: cleanDescription } : {}),
 		...(ordered ? { ordered: true as const } : {}),
 	};
 	let count = 0;
