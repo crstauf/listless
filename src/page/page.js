@@ -13,11 +13,13 @@
 	const MAX_TASK_LENGTH = 1000;
 	const MAX_DETAILS_LENGTH = 2000;
 	const MAX_TITLE_LENGTH = 200;
+	const MAX_DESCRIPTION_LENGTH = 2000;
 
 	const $ = (id) => document.getElementById(id);
 	const els = {
 		bar: document.querySelector(".bar"),
 		title: $("title"),
+		description: $("description"),
 		progressText: $("progress-text"),
 		progressFill: $("progress-fill"),
 		copy: $("copy"),
@@ -37,7 +39,7 @@
 
 	let id = null;
 	let persistent = true;
-	// state: { title, ordered, sections: [{ title, tasks: [{ text, details }] }],
+	// state: { title, description, ordered, sections: [{ title, tasks: [{ text, details }] }],
 	//          checked: number[], hideCompleted, hideUpcoming, hideDetails, createdAt }
 	// Task numbers in `checked` count across all sections, in order.
 	let state = null;
@@ -68,6 +70,7 @@
 	function normalizeList(value) {
 		if (!value || typeof value !== "object") return null;
 		if (value.title !== undefined && typeof value.title !== "string") return null;
+		if (value.description !== undefined && typeof value.description !== "string") return null;
 
 		let sections;
 		if (Array.isArray(value.sections)) {
@@ -89,6 +92,7 @@
 
 		return {
 			title: clip(value.title || "", MAX_TITLE_LENGTH),
+			description: clip(value.description || "", MAX_DESCRIPTION_LENGTH),
 			ordered: value.ordered === true,
 			sections,
 		};
@@ -195,8 +199,10 @@
 
 	// The ID is derived from the list's content, so reopening the same link
 	// finds the same saved list (and its checks) instead of creating a copy.
+	// (A list without a description hashes as it did before descriptions existed.)
 	async function listId(list) {
-		const canonical = JSON.stringify({ title: list.title, ordered: list.ordered, sections: list.sections });
+		const { title, description, ordered, sections } = list;
+		const canonical = JSON.stringify(description ? { title, description, ordered, sections } : { title, ordered, sections });
 		const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
 		return toBase64Url(new Uint8Array(digest)).slice(0, ID_LENGTH);
 	}
@@ -207,21 +213,58 @@
 		return state.title || "Checklist";
 	}
 
-	// Text is plain except for `backtick` spans, which become <code>.
-	function renderInline(target, text) {
+	// Text is plain except for `backtick` spans, which become <code>. With
+	// `links`, bare http(s) addresses outside code also become links.
+	function renderInline(target, text, links = false) {
 		const parts = text.split(/(`[^`\n]+`)/);
 		target.replaceChildren(
 			...parts
 				.filter((part) => part !== "")
-				.map((part) => {
+				.flatMap((part) => {
 					if (part.length > 2 && part.startsWith("`") && part.endsWith("`")) {
 						const code = document.createElement("code");
 						code.textContent = part.slice(1, -1);
-						return code;
+						return [code];
 					}
-					return document.createTextNode(part);
+					return links ? linkify(part) : [document.createTextNode(part)];
 				}),
 		);
+	}
+
+	// Punctuation at the end of an address (a full stop, or a closing bracket
+	// that the address didn't open) is left out of the link.
+	function trimAddress(address) {
+		const count = (char) => address.split(char).length - 1;
+		for (;;) {
+			const end = address.at(-1);
+			const unopened = (end === ")" && count(")") > count("(")) || (end === "]" && count("]") > count("["));
+			if (!unopened && !".,;:!?'\"".includes(end)) return address;
+			address = address.slice(0, -1);
+		}
+	}
+
+	function linkify(text) {
+		const nodes = [];
+		let last = 0;
+		for (const match of text.matchAll(/https?:\/\/[^\s<>"]+/g)) {
+			const href = trimAddress(match[0]);
+			let url;
+			try {
+				url = new URL(href);
+			} catch {
+				continue;
+			}
+			if (match.index > last) nodes.push(document.createTextNode(text.slice(last, match.index)));
+			const link = document.createElement("a");
+			link.href = url.href;
+			link.textContent = href;
+			link.target = "_blank";
+			link.rel = "noopener noreferrer";
+			nodes.push(link);
+			last = match.index + href.length;
+		}
+		if (last < text.length) nodes.push(document.createTextNode(text.slice(last)));
+		return nodes;
 	}
 
 	function el(tag, className) {
@@ -253,6 +296,8 @@
 		els.list.hidden = false;
 		renderInline(els.title, displayTitle());
 		document.title = displayTitle().replace(/`/g, "") + " · Listless";
+		renderInline(els.description, state.description, true);
+		els.description.hidden = !state.description;
 
 		const hasDetails = state.sections.some((section) => section.tasks.some((task) => task.details));
 		els.toggleUpcoming.hidden = !state.ordered;
@@ -371,6 +416,7 @@
 
 	function showMessage(title, body) {
 		els.bar.hidden = true;
+		els.description.hidden = true;
 		els.list.hidden = true;
 		els.upcomingHidden.hidden = true;
 		els.allDone.hidden = true;
@@ -412,7 +458,7 @@
 
 	// One click selects a whole code span (to copy it) without toggling the
 	// task it sits in.
-	els.list.addEventListener("click", (event) => {
+	function selectCode(event) {
 		const code = event.target instanceof Element && event.target.closest("code");
 		if (!code) return;
 		event.preventDefault();
@@ -421,7 +467,9 @@
 		const selection = getSelection();
 		selection.removeAllRanges();
 		selection.addRange(range);
-	});
+	}
+	els.list.addEventListener("click", selectCode);
+	els.description.addEventListener("click", selectCode);
 
 	els.toggleDone.addEventListener("click", () => {
 		state.hideCompleted = !state.hideCompleted;
@@ -471,6 +519,7 @@
 		const checked = new Set(state.checked);
 		const oneLine = (text) => text.replace(/\s*\n\s*/g, " ");
 		const lines = [`# ${oneLine(displayTitle())}`];
+		if (state.description) lines.push("", ...state.description.split("\n").map((line) => line.trim()));
 		let index = 0;
 		for (const section of state.sections) {
 			lines.push("");
