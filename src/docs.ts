@@ -27,7 +27,7 @@ A link looks like:
 
     base64url( deflate-raw( UTF-8 JSON ) )   # base64url without "=" padding
 
-and the JSON is:
+and the JSON is a list (see "List format" below), for example:
 
     {"v": 1, "title": "Optional title", "tasks": ["First task", "Second task"]}
 
@@ -62,13 +62,53 @@ Response (201):
 
 Errors return 400 (or 413 for an oversized body) with {"error": "..."}.
 
+## List format
+
+    {
+      "v": 1,
+      "title": "Optional title",
+      "ordered": false,
+      "tasks": [ <task>, <task>, ... ]
+    }
+
+- title: optional.
+- ordered: optional, default false. In an ordered list, tasks must be done in
+  sequence: only the next unfinished task can be checked off, and later ones
+  are locked until it is. Use it when order matters (setup steps, a
+  procedure); leave it out for a set of independent to-dos.
+- tasks: each task is either a string, or an object with muted extra detail:
+
+      "Buy milk"
+      {"text": "Create an API token", "details": "Use the \`Edit Cloudflare Workers\` template."}
+
+  Keep "text" short and actionable; put explanation, context or caveats in
+  "details". The user can hide all details with one tap.
+
+To group tasks under headings, use "sections" instead of "tasks":
+
+    {
+      "v": 1,
+      "title": "Ship the release",
+      "ordered": true,
+      "sections": [
+        {"title": "Prepare", "tasks": ["Review the PR", {"text": "Bump the version", "details": "Edit \`package.json\`."}]},
+        {"title": "Release", "tasks": ["Merge to \`main\`", "Run \`npm publish\`"]}
+      ]
+    }
+
+Order in an ordered list runs across all sections.
+
+Text is plain: Markdown and HTML are shown literally, except that \`backticks\`
+mark code. Wrap commands, file names, paths, URLs and identifiers in
+backticks; the user can select a code span with one click to copy it.
+
 ## Limits
 
-- tasks: 1 to ${LIMITS.maxTasks} non-empty strings, each at most ${LIMITS.maxTaskLength} characters
-- title: optional, at most ${LIMITS.maxTitleLength} characters
+- tasks: 1 to ${LIMITS.maxTasks} in total; task text at most ${LIMITS.maxTaskLength} characters
+- details: at most ${LIMITS.maxDetailsLength} characters
+- sections: 1 to ${LIMITS.maxSections}, each with a title and at least one task
+- titles (list and section): at most ${LIMITS.maxTitleLength} characters
 - POST body: at most ${LIMITS.maxBodyBytes / 1024} KB
-
-Tasks are plain text; Markdown and HTML are shown literally.
 
 ## Giving the link to the user
 
