@@ -25,6 +25,33 @@ describe("POST /api/lists", () => {
 		}
 	});
 
+	it("round-trips ordered lists, sections and task details", async () => {
+		const list = {
+			title: "Ship it",
+			ordered: true,
+			sections: [
+				{ title: " Setup ", tasks: ["Review the PR", { text: "Create a token ", details: " Use the `Edit Workers` template. " }] },
+				{ title: "Deploy", tasks: [{ text: "Run `npm run deploy`" }] },
+			],
+		};
+		const { res, data } = await createLink(list);
+		expect(res.status).toBe(201);
+		expect(await decodeList(data.url!.split("#")[1])).toEqual({
+			v: 1,
+			title: "Ship it",
+			ordered: true,
+			sections: [
+				{ title: "Setup", tasks: ["Review the PR", { text: "Create a token", details: "Use the `Edit Workers` template." }] },
+				{ title: "Deploy", tasks: ["Run `npm run deploy`"] },
+			],
+		});
+	});
+
+	it("omits ordered when false and blank details", async () => {
+		const { data } = await createLink({ ordered: false, tasks: [{ text: "One", details: "  " }] });
+		expect(await decodeList(data.url!.split("#")[1])).toEqual({ v: 1, tasks: ["One"] });
+	});
+
 	it("keeps 50 tasks to a reasonable link length", async () => {
 		const tasks = Array.from({ length: 50 }, (_, i) => `Task ${i + 1}: do the thing that needs doing next`);
 		const { data } = await createLink({ title: "Fifty", tasks });
@@ -43,6 +70,15 @@ describe("POST /api/lists", () => {
 		["too many tasks", JSON.stringify({ tasks: Array(LIMITS.maxTasks + 1).fill("t") })],
 		["a task that is too long", JSON.stringify({ tasks: ["t".repeat(LIMITS.maxTaskLength + 1)] })],
 		["a title that is too long", JSON.stringify({ title: "t".repeat(LIMITS.maxTitleLength + 1), tasks: ["ok"] })],
+		["both tasks and sections", JSON.stringify({ tasks: ["ok"], sections: [{ title: "s", tasks: ["ok"] }] })],
+		["empty sections", JSON.stringify({ sections: [] })],
+		["a section without tasks", JSON.stringify({ sections: [{ title: "s", tasks: [] }] })],
+		["a section without a title", JSON.stringify({ sections: [{ tasks: ["ok"] }] })],
+		["too many sections", JSON.stringify({ sections: Array(LIMITS.maxSections + 1).fill({ title: "s", tasks: ["ok"] }) })],
+		["too many tasks across sections", JSON.stringify({ sections: Array(2).fill({ title: "s", tasks: Array(LIMITS.maxTasks / 2 + 1).fill("t") }) })],
+		["a task object without text", JSON.stringify({ tasks: [{ details: "d" }] })],
+		["details that are too long", JSON.stringify({ tasks: [{ text: "ok", details: "d".repeat(LIMITS.maxDetailsLength + 1) }] })],
+		["a non-boolean ordered", JSON.stringify({ ordered: "yes", tasks: ["ok"] })],
 	])("rejects %s with 400", async (_, body) => {
 		const res = await post("/api/lists", body);
 		expect(res.status).toBe(400);
