@@ -230,6 +230,23 @@
 		return node;
 	}
 
+	const SVG_NS = "http://www.w3.org/2000/svg";
+
+	// The visible checkbox: a styled box with a check mark that draws itself
+	// in when the (visually hidden) real checkbox before it is checked.
+	function checkmark() {
+		const box = el("span", "box");
+		const svg = document.createElementNS(SVG_NS, "svg");
+		const path = document.createElementNS(SVG_NS, "path");
+		svg.setAttribute("viewBox", "0 0 24 24");
+		svg.setAttribute("aria-hidden", "true");
+		path.setAttribute("d", "M6 12.5l4 4 8-9");
+		path.setAttribute("pathLength", "1");
+		svg.append(path);
+		box.append(svg);
+		return box;
+	}
+
 	function render() {
 		els.message.hidden = true;
 		els.bar.hidden = false;
@@ -265,11 +282,12 @@
 				const body = el("span", "body");
 				const text = el("span", "text");
 				box.type = "checkbox";
+				box.className = "visually-hidden";
 				box.dataset.index = String(index);
 				renderInline(text, task.text);
 				if (state.ordered) {
 					const step = el("span", "step");
-					step.textContent = String(index + 1);
+					step.textContent = `Step ${index + 1}`;
 					body.append(step);
 				}
 				body.append(text);
@@ -278,7 +296,7 @@
 					renderInline(details, task.details);
 					body.append(details);
 				}
-				label.append(box, body);
+				label.append(box, checkmark(), body);
 				li.append(label);
 				list.append(li);
 				const row = { li, box, sectionIndex };

@@ -14,29 +14,29 @@
 <body>
 <header class="bar" hidden>
 	<div class="bar-inner">
-		<h1 id="title"></h1>
-		<div class="progress-row">
+		<div class="heading">
+			<h1 id="title"></h1>
 			<p id="progress-text" aria-live="polite"></p>
-			<div class="actions" role="toolbar" aria-label="List actions">
-				<button type="button" id="copy" class="icon" aria-label="Copy as Markdown" title="Copy as Markdown">
-					<svg viewBox="0 0 24 24" aria-hidden="true"><g class="when-idle"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5"/></g><path class="when-flash" d="M5 12.5l4.5 4.5L19 7.5"/></svg>
-				</button>
-				<button type="button" id="toggle-done" class="icon" aria-pressed="false">
-					<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.25l2.5 2.5 4.5-5"/><path class="slash-gap" d="M4 4l16 16"/><path class="slash" d="M4 4l16 16"/></svg>
-				</button>
-				<button type="button" id="toggle-upcoming" class="icon" aria-pressed="false" hidden>
-					<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3"/><path class="slash-gap" d="M4 4l16 16"/><path class="slash" d="M4 4l16 16"/></svg>
-				</button>
-				<button type="button" id="toggle-details" class="icon" aria-pressed="false" hidden>
-					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 11h16M4 16h10"/><path class="slash-gap" d="M4 4l16 16"/><path class="slash" d="M4 4l16 16"/></svg>
-				</button>
-				<button type="button" id="reset" class="icon" aria-label="Uncheck all" title="Uncheck all">
-					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4.5V9h4.5"/></svg>
-				</button>
-				<button type="button" id="delete" class="icon danger" aria-label="Delete list" title="Delete list">
-					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M9 7V4.5h6V7"/><path d="M6 7l.9 12.1A1.5 1.5 0 0 0 8.4 20.5h7.2a1.5 1.5 0 0 0 1.5-1.4L18 7"/></svg>
-				</button>
-			</div>
+		</div>
+		<div class="actions" role="toolbar" aria-label="List actions">
+			<button type="button" id="copy" class="icon" aria-label="Copy as Markdown" title="Copy as Markdown">
+				<svg viewBox="0 0 24 24" aria-hidden="true"><g class="when-idle"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5"/></g><path class="when-flash" d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+			</button>
+			<button type="button" id="toggle-done" class="icon" aria-pressed="false">
+				<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.25l2.5 2.5 4.5-5"/><path class="slash-gap" d="M4 4l16 16"/><path class="slash" d="M4 4l16 16"/></svg>
+			</button>
+			<button type="button" id="toggle-upcoming" class="icon" aria-pressed="false" hidden>
+				<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3"/><path class="slash-gap" d="M4 4l16 16"/><path class="slash" d="M4 4l16 16"/></svg>
+			</button>
+			<button type="button" id="toggle-details" class="icon" aria-pressed="false" hidden>
+				<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 11h16M4 16h10"/><path class="slash-gap" d="M4 4l16 16"/><path class="slash" d="M4 4l16 16"/></svg>
+			</button>
+			<button type="button" id="reset" class="icon" aria-label="Uncheck all" title="Uncheck all">
+				<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4.5V9h4.5"/></svg>
+			</button>
+			<button type="button" id="delete" class="icon danger" aria-label="Delete list" title="Delete list">
+				<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M9 7V4.5h6V7"/><path d="M6 7l.9 12.1A1.5 1.5 0 0 0 8.4 20.5h7.2a1.5 1.5 0 0 0 1.5-1.4L18 7"/></svg>
+			</button>
 		</div>
 	</div>
 	<div class="progress-track" aria-hidden="true"><div id="progress-fill"></div></div>
@@ -46,7 +46,10 @@
 	<p id="notice" class="notice" hidden></p>
 	<div id="list" hidden></div>
 	<button type="button" id="upcoming-hidden" class="upcoming-hidden" hidden></button>
-	<p id="all-done" class="all-done" hidden>All done.</p>
+	<div id="all-done" class="all-done" hidden>
+		<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="22"/><path d="M14.5 24.5l6.5 6.5 13-14"/></svg>
+		<p><strong>All done.</strong> Every task is checked off.</p>
+	</div>
 	<section id="message" class="message" hidden>
 		<h1 id="message-title"></h1>
 		<p id="message-body"></p>
