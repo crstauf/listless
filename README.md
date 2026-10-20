@@ -31,7 +31,7 @@ Give an agent a wall of text, let it pull out the tasks, and get back a link to 
 
 3. You check things off. Everything is saved in your browser as you go.
 
-The page shows progress overall and per section. Its toolbar has **Copy as Markdown** (to paste your progress back to an agent), **Hide completed**, **Hide upcoming** (ordered lists), **Hide details**, **Uncheck all**, and **Delete**. Clicking a code span selects all of it, ready to copy.
+The page shows progress overall and per section. Its toolbar has **Copy as Markdown** (to paste your progress back to an agent), **Hide completed**, **Hide upcoming** (ordered lists), **Hide details**, **Uncheck all**, and **Delete**. Only the checkbox toggles a task, so the text can be selected like any other text. Web addresses in it are links, and clicking a code span selects all of it, ready to copy.
 
 ## List format
 
@@ -90,13 +90,14 @@ Limits:
 | Opening a locally built link | One `GET /l/` for the page, which contains no task data. Nothing after that. |
 | Using `POST /api/lists` | One `POST` with the tasks; the response is the link. Nothing is stored or logged. |
 | Reopening `/l/<id>` | One `GET` for the page. The list stays in your browser. |
+| Clicking a link in a list | The linked site opens in a new tab, with no referrer, so it doesn't learn which list you came from. Nothing happens until you click. |
 
 ## How to verify
 
 You don't have to take this README's word for it:
 
 1. **View the page source.** The `<meta http-equiv="Content-Security-Policy">` tag includes `default-src 'none'` and `connect-src 'none'`. Together they block every fetch, XHR, WebSocket, beacon, form submission and external resource. The same policy is sent as a response header.
-2. **Watch the Network tab** in your browser's developer tools while you open a list and check things off. After the page loads, there are no requests.
+2. **Watch the Network tab** in your browser's developer tools while you open a list and check things off. After the page loads, there are no requests, unless you click a link in the list, which opens in a new tab.
 3. **Read the code.** The whole page is [`src/page/`](src/page/), and the Worker is [`src/index.ts`](src/index.ts). The tests check that the policy forbids network access, that its hashes match the page's only inline script and style, and that the Worker has no storage bindings.
 4. **Check the deploy.** The hosted Worker is deployed only by [this repository's workflow](.github/workflows/deploy.yml) from `master`, and Workers logging is turned off in [`wrangler.jsonc`](wrangler.jsonc).
 
