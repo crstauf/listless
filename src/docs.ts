@@ -73,11 +73,9 @@ Errors return 400 (or 413 for an oversized body) with {"error": "..."}.
     }
 
 - title: optional.
-- description: optional. Shown under the title, with line breaks kept. Web
-  addresses (http:// or https://) in it become links, so when you know the
-  address of the conversation the list came from, put it here so the user
-  can get back to it. Write the address bare, not in backticks, so it stays
-  clickable. Keep it to a sentence or two.
+- description: optional. Shown under the title, with line breaks kept. When
+  you know the address of the conversation the list came from, put it here
+  so the user can get back to it. Keep it to a sentence or two.
 - ordered: optional, default false. In an ordered list, tasks must be done in
   sequence: only the next unfinished task can be checked off, and later ones
   are locked until it is. Use it when order matters (setup steps, a
@@ -104,10 +102,17 @@ To group tasks under headings, use "sections" instead of "tasks":
 
 Order in an ordered list runs across all sections.
 
-Text is plain: Markdown and HTML are shown literally, except that \`backticks\`
-mark code. Wrap commands, file names, paths, URLs and identifiers in
-backticks; the user can select a code span with one click to copy it.
-(The exception is a link in "description", which should be left bare.)
+Text is plain: Markdown and HTML are shown literally, with two exceptions:
+
+- \`backticks\` mark code. Wrap commands, file names, paths and identifiers
+  in backticks; the user can select a code span with one click to copy it.
+- Web addresses (http:// or https://) in task text, details and the
+  description become links that open in a new tab. Write an address bare,
+  not in backticks, when the user should be able to open it; in backticks it
+  stays code, for copying.
+
+Only the checkbox toggles a task, so links and code in a task are safe to
+click.
 
 ## Limits
 
