@@ -130,6 +130,8 @@ npm test
 
 The page source lives in `src/page/` (`page.html`, `page.css`, `page.js`). `npm run build` inlines the CSS and JS into the HTML, computes the SHA-256 hashes the Content-Security-Policy needs, and writes `src/page.generated.ts`. That file is committed so the deployed page can be reviewed in the repository. CI rebuilds it and fails if it differs.
 
+After changing how the page looks, run `npm run screenshots` to recapture the README preview (`docs/preview-light.png` and `docs/preview-dark.png`). It needs Playwright's Chromium, which you can install once with `npx playwright install chromium`. No server is needed.
+
 ### Deploying from GitHub Actions
 
 `.github/workflows/deploy.yml` runs the checks on every push and pull request, and deploys on pushes to `master`. It needs two repository (or `production` environment) secrets:
