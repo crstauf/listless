@@ -37,7 +37,8 @@ ${origin}/l/<id>.
 
 ### Option 1 (preferred): build the link yourself
 
-Nothing is sent anywhere. Pipe the JSON (title and tasks) into either command.
+Nothing is sent anywhere. Pipe the list as JSON (everything in "List format"
+below except "v", which the commands add) into either command.
 
 Python:
 
@@ -136,6 +137,9 @@ The link can be long. Show it as a Markdown link, for example
   stored or logged.
 - Reopening ${origin}/l/<id>: one GET for the page. The id is a hash of the
   list, and the list itself stays in the browser.
+- A link in the list goes to its own site only when the user clicks it. It
+  opens in a new tab and sends no referrer, so that site doesn't learn which
+  list it came from.
 
 Source: https://github.com/crstauf/listless
 `;
