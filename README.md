@@ -44,11 +44,11 @@ The page shows progress overall and per section. Its toolbar has **Copy as Markd
 ```
 
 - **`title`**: optional.
-- **`description`**: optional. It's shown under the title. Web addresses in it become links, so agents can link back to the conversation the list came from.
+- **`description`**: optional. It's shown under the title, which makes it a good place for a link back to the conversation the list came from.
 - **`ordered`**: optional. When `true`, tasks are done in sequence: only the next unfinished task can be checked off, and the ones after it stay locked. Unchecking a step reopens it and every step after it.
 - **`tasks`**: an array of tasks. A task is a string, or `{ "text", "details" }` when it needs extra explanation. Details show in smaller, muted text, and the reader can hide them.
 - **`sections`**: use this instead of `tasks` to group tasks under headings.
-- **Code:** text is plain, except that `` `backtick` `` spans show as code.
+- **Text** is plain, with two exceptions: `` `backtick` `` spans show as code, and web addresses (`http://` or `https://`) in task text, details and the description become links. Only the checkbox toggles a task, so clicking text, code or a link never checks it off.
 
 ## For agents
 
