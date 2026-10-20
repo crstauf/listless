@@ -328,6 +328,10 @@ main {
 	transition: background-color 200ms, border-color 200ms, box-shadow 200ms, opacity 200ms;
 }
 
+.tasks .task:not(.current, .upcoming):hover {
+	border-color: var(--border-strong);
+}
+
 /* Only the checkbox toggles a task. Its padding makes a 44px tap target
    without moving the box. */
 .tasks .check {
