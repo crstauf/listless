@@ -22,21 +22,21 @@
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		--bg: #121513;
-		--surface: #1b1f1d;
-		--surface-done: #161917;
-		--text: #e8ebe8;
-		--muted: #a0a8a3;
-		--faint: #6d756f;
-		--border: #2a302d;
-		--border-strong: #49514c;
+		--bg: #141414;
+		--surface: #1e1e1e;
+		--surface-done: #181818;
+		--text: #eaeaea;
+		--muted: #a5a5a5;
+		--faint: #727272;
+		--border: #2d2d2d;
+		--border-strong: #4d4d4d;
 		--accent: #6fc4a8;
 		--accent-strong: #8fd6be;
 		--accent-soft: #1d3a31;
 		--on-accent: #0f2a22;
 		--danger: #f0907f;
 		--danger-soft: #3a211d;
-		--code-bg: #262c29;
+		--code-bg: #292929;
 		--shadow: 0 1px 2px rgb(0 0 0 / 0.3);
 		--shadow-current: 0 2px 4px rgb(0 0 0 / 0.3), 0 8px 24px rgb(111 196 168 / 0.1);
 	}
