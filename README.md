@@ -7,7 +7,7 @@ Give an agent a wall of text, let it pull out the tasks, and get back a link to 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.png">
-    <img src="docs/screenshot-light.png" width="380" alt="A Listless checklist titled “Release v2.4”: an ordered list in three sections, with the first three steps checked off and step 4, “Publish to npm”, highlighted as up next.">
+    <img src="docs/screenshot-light.png" width="640" alt="A Listless checklist titled “Release v2.4”: an ordered list of three steps with a description linking to the release thread. Step 1 is checked off, step 2, “Publish to npm”, is highlighted as up next, and step 3 is locked.">
   </picture>
 </p>
 
