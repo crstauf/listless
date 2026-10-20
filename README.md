@@ -4,6 +4,13 @@ Turn a list of tasks into a checklist page that lives only in your browser.
 
 Give an agent a wall of text, let it pull out the tasks, and get back a link to a clean checklist: one checkbox per task. It works at any screen size and follows your system's light or dark setting.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.png">
+    <img src="docs/screenshot-light.png" width="380" alt="A Listless checklist titled “Release v2.4”: an ordered list in three sections, with the first three steps checked off and step 4, “Publish to npm”, highlighted as up next.">
+  </picture>
+</p>
+
 ## No off-site storage: everything is local
 
 - Lists, check marks and preferences are stored **only in the browser that opens the link** (`localStorage`).
