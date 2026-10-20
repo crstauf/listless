@@ -321,15 +321,19 @@
 			const list = el(state.ordered ? "ol" : "ul", "tasks");
 			for (const task of section.tasks) {
 				const index = rows.length;
+				// Only the checkbox toggles the task; the text is ordinary text
+				// that can be selected, and its links followed.
 				const li = el("li", "task");
-				const label = el("label");
+				const label = el("label", "check");
 				const box = el("input");
-				const body = el("span", "body");
+				const body = el("div", "body");
 				const text = el("span", "text");
 				box.type = "checkbox";
 				box.className = "visually-hidden";
 				box.dataset.index = String(index);
-				renderInline(text, task.text);
+				text.id = `task-${index}`;
+				box.setAttribute("aria-labelledby", text.id);
+				renderInline(text, task.text, true);
 				if (state.ordered) {
 					const step = el("span", "step");
 					step.textContent = `Step ${index + 1}`;
@@ -338,11 +342,13 @@
 				body.append(text);
 				if (task.details) {
 					const details = el("span", "details");
-					renderInline(details, task.details);
+					details.id = `task-${index}-details`;
+					box.setAttribute("aria-describedby", details.id);
+					renderInline(details, task.details, true);
 					body.append(details);
 				}
-				label.append(box, checkmark(), body);
-				li.append(label);
+				label.append(box, checkmark());
+				li.append(label, body);
 				list.append(li);
 				const row = { li, box, sectionIndex };
 				rows.push(row);
@@ -456,8 +462,7 @@
 		update();
 	});
 
-	// One click selects a whole code span (to copy it) without toggling the
-	// task it sits in.
+	// One click selects a whole code span, ready to copy.
 	function selectCode(event) {
 		const code = event.target instanceof Element && event.target.closest("code");
 		if (!code) return;

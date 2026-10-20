@@ -316,7 +316,7 @@ main {
 	gap: 8px;
 }
 
-.tasks label {
+.tasks .task {
 	display: flex;
 	align-items: flex-start;
 	gap: 14px;
@@ -325,12 +325,18 @@ main {
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
 	box-shadow: var(--shadow);
-	cursor: pointer;
 	transition: background-color 200ms, border-color 200ms, box-shadow 200ms, opacity 200ms;
 }
 
-.tasks label:hover {
-	border-color: var(--border-strong);
+/* Only the checkbox toggles a task. Its padding makes a 44px tap target
+   without moving the box. */
+.tasks .check {
+	flex: none;
+	display: grid;
+	padding: 10px;
+	margin: -10px;
+	border-radius: 12px;
+	cursor: pointer;
 }
 
 .tasks .body {
@@ -372,7 +378,7 @@ main {
 	transition: background-color 150ms, border-color 150ms;
 }
 
-.tasks label:hover .box {
+.tasks .check:hover .box {
 	border-color: var(--accent);
 }
 
@@ -409,7 +415,7 @@ main {
 }
 
 /* Completed. */
-.tasks .done label {
+.tasks .done {
 	background: var(--surface-done);
 	box-shadow: none;
 }
@@ -435,7 +441,7 @@ main {
 	font-variant-numeric: tabular-nums;
 }
 
-.tasks .current label {
+.tasks .current {
 	border-color: var(--accent);
 	box-shadow: var(--shadow-current);
 }
@@ -452,16 +458,18 @@ main {
 	font-weight: 600;
 }
 
-.tasks .upcoming label {
+.tasks .upcoming {
 	background: transparent;
 	box-shadow: none;
 	border-style: dashed;
 	opacity: 0.6;
+}
+
+.tasks .upcoming .check {
 	cursor: not-allowed;
 }
 
-.tasks .upcoming label:hover,
-.tasks .upcoming label:hover .box {
+.tasks .upcoming .check:hover .box {
 	border-color: var(--border-strong);
 }
 
@@ -494,6 +502,10 @@ code:hover {
 
 h1 code {
 	font-size: 0.8em;
+}
+
+.tasks a {
+	text-underline-offset: 2px;
 }
 
 .tasks .done code {
