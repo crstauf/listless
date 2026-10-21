@@ -88,6 +88,10 @@ Errors return 400 (or 413 for an oversized body) with {"error": "..."}.
 
   Keep "text" short and actionable; put explanation, context or caveats in
   "details". The user can hide all details with one tap.
+  Add "done": true to an object task that is already complete; it starts out
+  checked off. In an ordered list, done tasks must come before all others.
+
+      {"text": "Draft the outline", "done": true}
 
 To group tasks under headings, use "sections" instead of "tasks":
 

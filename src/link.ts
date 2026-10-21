@@ -15,8 +15,9 @@ export const LIMITS = {
 export const FORMAT_PREFIX = "v1.";
 
 // A task is plain text, or text plus muted details. Backtick spans in any text
-// are shown as code on the page; nothing else is interpreted.
-export type Task = string | { text: string; details?: string };
+// are shown as code on the page; nothing else is interpreted. `done` marks a
+// task that starts out checked off.
+export type Task = string | { text: string; details?: string; done?: true };
 
 export interface Section {
 	title: string;
@@ -73,6 +74,7 @@ function toList(input: unknown): List {
 	if (tasks !== undefined) {
 		const cleaned = taskList(tasks, "tasks");
 		countTasks(cleaned.length);
+		if (ordered) checkDoneFirst(cleaned);
 		return { ...head, tasks: cleaned };
 	}
 
@@ -90,7 +92,19 @@ function toList(input: unknown): List {
 		countTasks(sectionTasks.length);
 		return { title: sectionTitle, tasks: sectionTasks };
 	});
+	if (ordered) checkDoneFirst(cleanedSections.flatMap((section) => section.tasks));
 	return { ...head, sections: cleanedSections };
+}
+
+// Ordered lists are completed from the top, so a task can only start out done
+// if every task before it does too.
+function checkDoneFirst(tasks: Task[]): void {
+	let open = false;
+	for (const task of tasks) {
+		const done = typeof task !== "string" && task.done === true;
+		if (done && open) throw new InvalidList('In an ordered list, "done" tasks must come before all others.');
+		if (!done) open = true;
+	}
 }
 
 function taskList(value: unknown, path: string): Task[] {
@@ -108,7 +122,11 @@ function cleanTask(task: unknown, path: string): Task {
 	if (!isObject(task)) throw new InvalidList(`${path} must be a string or an object with "text".`);
 	const text = requiredText(task.text, `${path}.text`, LIMITS.maxTaskLength);
 	const details = optionalText(task.details, `${path}.details`, LIMITS.maxDetailsLength);
-	return details ? { text, details } : text;
+	if (task.done !== undefined && typeof task.done !== "boolean") {
+		throw new InvalidList(`"${path}.done" must be true or false when present.`);
+	}
+	if (!details && !task.done) return text;
+	return { text, ...(details ? { details } : {}), ...(task.done ? { done: true as const } : {}) };
 }
 
 function requiredText(value: unknown, path: string, max: number): string {

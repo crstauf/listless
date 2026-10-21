@@ -31,7 +31,7 @@ Give an agent a wall of text, let it pull out the tasks, and get back a link to 
 
 3. You check things off. Everything is saved in your browser as you go.
 
-The page shows progress overall and per section. Its toolbar has **Copy as Markdown** (to paste your progress back to an agent), **Hide completed**, **Hide upcoming** (ordered lists), **Hide details**, **Uncheck all**, and **Delete**. Only the checkbox toggles a task, so the text can be selected like any other text. Web addresses in it are links, and clicking a code span selects all of it, ready to copy.
+The page shows progress overall and per section. In unordered lists, tasks can be reordered within their section by dragging the handle beside them, or with the arrow keys when it's focused. Its toolbar has **Copy as Markdown** (to paste your progress back to an agent), **Copy share link** (a full link carrying the list as it is now, with its order and check marks; building it happens in your browser and sends nothing), **Hide completed**, **Hide upcoming** (ordered lists), **Hide details**, **Uncheck all**, and **Delete**. Only the checkbox toggles a task, so the text can be selected like any other text. Web addresses in it are links, and clicking a code span selects all of it, ready to copy.
 
 ## List format
 
@@ -51,7 +51,7 @@ The page shows progress overall and per section. Its toolbar has **Copy as Markd
 - **`title`**: optional.
 - **`description`**: optional. It's shown under the title, which makes it a good place for a link back to the conversation the list came from.
 - **`ordered`**: optional. When `true`, tasks are done in sequence: only the next unfinished task can be checked off, and the ones after it stay locked. Unchecking a step reopens it and every step after it.
-- **`tasks`**: an array of tasks. A task is a string, or `{ "text", "details" }` when it needs extra explanation. Details show in smaller, muted text, and the reader can hide them.
+- **`tasks`**: an array of tasks. A task is a string, or `{ "text", "details" }` when it needs extra explanation. Details show in smaller, muted text, and the reader can hide them. Add `"done": true` to a task that is already complete and it starts out checked off (in an ordered list, done tasks must come before all others).
 - **`sections`**: use this instead of `tasks` to group tasks under headings.
 - **Text** is plain, with two exceptions: `` `backtick` `` spans show as code, and web addresses (`http://` or `https://`) in task text, details and the description become links. Only the checkbox toggles a task, so clicking text, code or a link never checks it off.
 

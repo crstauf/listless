@@ -23,6 +23,8 @@
 		progressText: $("progress-text"),
 		progressFill: $("progress-fill"),
 		copy: $("copy"),
+		share: $("share"),
+		announce: $("announce"),
 		toggleDone: $("toggle-done"),
 		toggleUpcoming: $("toggle-upcoming"),
 		toggleDetails: $("toggle-details"),
@@ -51,10 +53,10 @@
 	const clip = (text, max) => text.trim().slice(0, max);
 
 	function normalizeTask(task) {
-		if (typeof task === "string" && task.trim()) return { text: clip(task, MAX_TASK_LENGTH), details: "" };
+		if (typeof task === "string" && task.trim()) return { text: clip(task, MAX_TASK_LENGTH), details: "", done: false };
 		if (task && typeof task === "object" && typeof task.text === "string" && task.text.trim()) {
 			const details = typeof task.details === "string" ? clip(task.details, MAX_DETAILS_LENGTH) : "";
-			return { text: clip(task.text, MAX_TASK_LENGTH), details };
+			return { text: clip(task.text, MAX_TASK_LENGTH), details, done: task.done === true };
 		}
 		return null;
 	}
@@ -90,12 +92,33 @@
 		const total = sections.reduce((sum, section) => sum + section.tasks.length, 0);
 		if (total > MAX_TASKS) return null;
 
+		// Tasks marked done start out checked. That's progress, not content, so it
+		// is split off here and never becomes part of the list (or its id).
+		const ordered = value.ordered === true;
+		let initialChecked = [];
+		let index = 0;
+		for (const section of sections) {
+			for (const task of section.tasks) {
+				if (task.done) initialChecked.push(index);
+				index++;
+			}
+			section.tasks = section.tasks.map(({ text, details }) => ({ text, details }));
+		}
+		if (ordered) initialChecked = leadingRun(initialChecked);
+
 		return {
 			title: clip(value.title || "", MAX_TITLE_LENGTH),
 			description: clip(value.description || "", MAX_DESCRIPTION_LENGTH),
-			ordered: value.ordered === true,
+			ordered,
 			sections,
+			initialChecked,
 		};
+	}
+
+	// Ordered lists are always completed from the top: keep only the unbroken
+	// run of checks from the first task.
+	function leadingRun(checked) {
+		return checked.filter((i, position) => i === position);
 	}
 
 	function totalTasks() {
@@ -147,15 +170,13 @@
 	}
 
 	function fromStored(value) {
-		const list = normalizeList(value);
-		if (!list) return null;
+		const { initialChecked, ...list } = normalizeList(value) || {};
+		if (!list.sections) return null;
 		const total = list.sections.reduce((sum, section) => sum + section.tasks.length, 0);
 		let checked = Array.isArray(value.checked)
 			? [...new Set(value.checked.filter((i) => Number.isInteger(i) && i >= 0 && i < total))].sort((a, b) => a - b)
 			: [];
-		// Ordered lists are always completed from the top: keep only the
-		// unbroken run of checks from the first task.
-		if (list.ordered) checked = checked.filter((i, position) => i === position);
+		if (list.ordered) checked = leadingRun(checked);
 		return {
 			...list,
 			checked,
@@ -166,10 +187,10 @@
 		};
 	}
 
-	function freshState(list) {
+	function freshState({ initialChecked, ...list }) {
 		return {
 			...list,
-			checked: [],
+			checked: initialChecked,
 			hideCompleted: false,
 			hideUpcoming: false,
 			hideDetails: false,
@@ -195,6 +216,12 @@
 		const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
 		const text = await new Response(stream).text();
 		return normalizeList(JSON.parse(text));
+	}
+
+	async function encodeFragment(value) {
+		const json = new TextEncoder().encode(JSON.stringify(value));
+		const stream = new Blob([json]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+		return FORMAT_PREFIX + toBase64Url(new Uint8Array(await new Response(stream).arrayBuffer()));
 	}
 
 	// The ID is derived from the list's content, so reopening the same link
@@ -290,6 +317,28 @@
 		return box;
 	}
 
+	// Reordering starts from this handle only, so the task text stays selectable.
+	function dragHandle(label) {
+		const handle = el("button", "icon handle");
+		handle.type = "button";
+		handle.setAttribute("aria-label", `Move: ${label.replace(/`/g, "")}`);
+		handle.title = "Drag to reorder, or use the arrow keys";
+		const svg = document.createElementNS(SVG_NS, "svg");
+		svg.setAttribute("viewBox", "0 0 24 24");
+		svg.setAttribute("aria-hidden", "true");
+		for (const cx of [9, 15]) {
+			for (const cy of [6, 12, 18]) {
+				const dot = document.createElementNS(SVG_NS, "circle");
+				dot.setAttribute("cx", String(cx));
+				dot.setAttribute("cy", String(cy));
+				dot.setAttribute("r", "1.25");
+				svg.append(dot);
+			}
+		}
+		handle.append(svg);
+		return handle;
+	}
+
 	function render() {
 		els.message.hidden = true;
 		els.bar.hidden = false;
@@ -350,6 +399,7 @@
 				label.append(box, checkmark());
 				li.append(label, body);
 				list.append(li);
+				if (!state.ordered) li.append(dragHandle(task.text));
 				const row = { li, box, sectionIndex };
 				rows.push(row);
 				groupRows.push(row);
@@ -433,8 +483,19 @@
 		document.title = "Listless";
 	}
 
-	function showNotice(text) {
+	// An optional action adds a button after the text: { label, run }.
+	function showNotice(text, action) {
 		els.notice.textContent = text;
+		if (action) {
+			const button = el("button");
+			button.type = "button";
+			button.textContent = action.label;
+			button.addEventListener("click", () => {
+				els.notice.hidden = true;
+				action.run();
+			});
+			els.notice.append(" ", button);
+		}
 		els.notice.hidden = false;
 	}
 
@@ -520,6 +581,125 @@
 		flash(els.copy, ok ? "Copied" : "Copy failed");
 	});
 
+	// The list as it is now, in link format: current order and check marks, but
+	// not view settings.
+	function toLinkJson() {
+		const checked = new Set(state.checked);
+		let index = 0;
+		const sections = state.sections.map((section) => {
+			const tasks = section.tasks.map((task) => {
+				const done = checked.has(index++);
+				if (!task.details && !done) return task.text;
+				return { text: task.text, ...(task.details ? { details: task.details } : {}), ...(done ? { done: true } : {}) };
+			});
+			return { ...(section.title ? { title: section.title } : {}), tasks };
+		});
+		const body = { v: 1 };
+		if (state.title) body.title = state.title;
+		if (state.description) body.description = state.description;
+		if (state.ordered) body.ordered = true;
+		if (sections.length === 1 && !state.sections[0].title) body.tasks = sections[0].tasks;
+		else body.sections = sections;
+		return body;
+	}
+
+	els.share.addEventListener("click", async () => {
+		const fragment = await encodeFragment(toLinkJson());
+		const ok = await copyText(`${location.origin}/l/${fragment}`);
+		flash(els.share, ok ? "Copied" : "Copy failed");
+	});
+
+	// ---- reordering --------------------------------------------------------------
+
+	function moveTask(sectionIndex, from, to) {
+		if (from === to) return;
+		const offset = state.sections.slice(0, sectionIndex).reduce((sum, section) => sum + section.tasks.length, 0);
+		const section = state.sections[sectionIndex];
+		const done = new Set(state.checked);
+		const items = section.tasks.map((task, k) => ({ task, done: done.has(offset + k) }));
+		items.splice(to, 0, ...items.splice(from, 1));
+		section.tasks = items.map((item) => item.task);
+		state.checked = state.checked
+			.filter((i) => i < offset || i >= offset + items.length)
+			.concat(items.flatMap((item, k) => (item.done ? [offset + k] : [])))
+			.sort((a, b) => a - b);
+		save();
+		render();
+		const moved = groupViews[sectionIndex].rows[to];
+		moved.li.querySelector(".handle").focus();
+		els.announce.textContent = `Moved to position ${to + 1} of ${items.length}`;
+	}
+
+	function rowPosition(handle) {
+		const li = handle.closest(".task");
+		const view = groupViews.find((v) => v.rows.some((row) => row.li === li));
+		return { sectionIndex: groupViews.indexOf(view), view, from: view.rows.findIndex((row) => row.li === li) };
+	}
+
+	els.list.addEventListener("keydown", (event) => {
+		const handle = event.target instanceof Element && event.target.closest(".handle");
+		if (!handle || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
+		event.preventDefault();
+		const { sectionIndex, view, from } = rowPosition(handle);
+		const to = from + (event.key === "ArrowUp" ? -1 : 1);
+		if (to < 0 || to >= view.rows.length) return;
+		moveTask(sectionIndex, from, to);
+	});
+
+	// Dragging only transforms rows; the DOM changes once, on release.
+	els.list.addEventListener("pointerdown", (event) => {
+		const handle = event.target instanceof Element && event.target.closest(".handle");
+		if (!handle || (event.pointerType === "mouse" && event.button !== 0)) return;
+		// Preventing the default stops text selection while dragging, but also stops
+		// the click from focusing the handle, so focus it here for the arrow keys.
+		event.preventDefault();
+		handle.focus();
+		const { sectionIndex, view, from } = rowPosition(handle);
+		const visible = view.rows.filter(({ li }) => !li.hidden);
+		const self = visible.findIndex((row) => row === view.rows[from]);
+		const rects = visible.map(({ li }) => li.getBoundingClientRect());
+		const gap = rects.length > 1 ? Math.max(0, rects[1].top - rects[0].bottom) : 8;
+		const shift = rects[self].height + gap;
+		const startY = event.clientY;
+		let target = self;
+
+		handle.setPointerCapture(event.pointerId);
+		const dragged = visible[self].li;
+		dragged.classList.add("dragging");
+		for (const { li } of visible) li.classList.add("shifting");
+
+		const place = () => {
+			visible.forEach(({ li }, k) => {
+				if (k === self) return;
+				const moves = (self < target && k > self && k <= target) ? -shift : (self > target && k >= target && k < self) ? shift : 0;
+				li.style.transform = moves ? `translateY(${moves}px)` : "";
+			});
+		};
+		const onMove = (e) => {
+			const dy = e.clientY - startY;
+			dragged.style.transform = `translateY(${dy}px)`;
+			const center = rects[self].top + rects[self].height / 2 + dy;
+			target = rects.reduce((count, rect, k) => (k !== self && rect.top + rect.height / 2 < center ? count + 1 : count), 0);
+			place();
+		};
+		const finish = (commit) => {
+			handle.removeEventListener("pointermove", onMove);
+			handle.removeEventListener("pointerup", onUp);
+			handle.removeEventListener("pointercancel", onCancel);
+			for (const { li } of visible) {
+				li.classList.remove("shifting");
+				li.style.transform = "";
+			}
+			dragged.classList.remove("dragging");
+			if (commit && target !== self) moveTask(sectionIndex, from, view.rows.indexOf(visible[target]));
+		};
+		const onUp = () => finish(true);
+		const onCancel = () => finish(false);
+		handle.addEventListener("pointermove", onMove);
+		handle.addEventListener("pointerup", onUp);
+		handle.addEventListener("pointercancel", onCancel);
+	});
+
 	function toMarkdown() {
 		const checked = new Set(state.checked);
 		const oneLine = (text) => text.replace(/\s*\n\s*/g, " ");
@@ -597,6 +777,45 @@
 
 	// ---- startup ---------------------------------------------------------------
 
+	// The saved copy wins when a link opens a list this browser already has. If
+	// the link marks tasks done that the saved copy hasn't checked, offer them.
+	// Tasks are matched by section and content, since the saved copy may have
+	// been reordered.
+	function offerLinkChecks(list) {
+		const key = (task) => task.text + "\0" + task.details;
+		const pending = state.sections.map((section) => {
+			const queues = new Map();
+			return { section, queues, add: (k, i) => queues.set(k, [...(queues.get(k) || []), i]) };
+		});
+		let index = 0;
+		pending.forEach(({ section, add }) => section.tasks.forEach((task) => add(key(task), index++)));
+
+		let linkIndex = 0;
+		const wanted = new Set(list.initialChecked);
+		let mapped = [];
+		list.sections.forEach((section, s) => {
+			for (const task of section.tasks) {
+				if (wanted.has(linkIndex++)) {
+					const match = pending[s]?.queues.get(key(task))?.shift();
+					if (match !== undefined) mapped.push(match);
+				}
+			}
+		});
+		mapped.sort((a, b) => a - b);
+		if (state.ordered) mapped = leadingRun(mapped);
+
+		const have = new Set(state.checked);
+		if (mapped.every((i) => have.has(i))) return;
+		showNotice("This link has check marks your saved copy doesn't.", {
+			label: "Use the link's check marks",
+			run: () => {
+				state.checked = mapped;
+				save();
+				update();
+			},
+		});
+	}
+
 	async function start() {
 		persistent = storageAvailable();
 
@@ -613,7 +832,8 @@
 			}
 
 			id = await listId(list);
-			state = (persistent && load(id)) || freshState(list);
+			const saved = persistent ? load(id) : null;
+			state = saved || freshState(list);
 
 			if (persistent) {
 				save();
@@ -623,6 +843,7 @@
 				showNotice("Your browser isn't letting this page save. Keep the original link; checks will be lost when you close it.");
 			}
 			render();
+			if (saved) offerLinkChecks(list);
 			return;
 		}
 
