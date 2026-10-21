@@ -6,7 +6,7 @@ Give an agent a wall of text, let it pull out the tasks, and get back a link to 
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/preview-dark.png">
-  <img src="docs/preview-light.png" width="800" alt="A Listless checklist titled “Release v2.4”, with a description linking to the release thread. Step 1 is checked off, step 2, “Publish to npm”, is highlighted as up next, and step 3 is locked until it’s done.">
+  <img src="docs/preview-light.png" width="800" alt="A Listless checklist titled “Release v2.4”, with a description linking to the release thread. Step 1 is checked off, step 2, “Publish to npm”, is highlighted as up next, and step 3 is locked until it’s done. A row of toolbar buttons sits at the top right.">
 </picture>
 
 ## No off-site storage: everything is local
@@ -27,7 +27,7 @@ Give an agent a wall of text, let it pull out the tasks, and get back a link to 
 
    `<data>` is `base64url(deflate-raw(JSON))`, and the JSON is a list such as `{"v":1,"title":"…","tasks":["…","…"]}` (see [List format](#list-format)). Browsers never send the part after `#` to a server.
 
-2. You open the link. The page reads the list from the address, saves it in your browser, and swaps the address for a short one: `https://<host>/l/<id>`. The id is a hash of the list's contents, so opening the same original link again finds the same list and keeps your check marks.
+2. You open the link. The page reads the list from the address, saves it in your browser, and swaps the address for a short one: `https://<host>/l/<id>`. The id is a hash of the list's contents, so opening the same original link again finds the same list and keeps your check marks and any reordering, because the id is fixed when you first open the list. Check marks never affect it, but a link whose tasks are in a different order (such as a share link from a list someone reordered) is a different list. If the link marks tasks done that your saved copy hasn't checked, the page tells you and offers to use the link's check marks; your saved copy is never changed without you asking.
 
 3. You check things off. Everything is saved in your browser as you go.
 
@@ -51,7 +51,7 @@ The page shows progress overall and per section. In unordered lists, tasks can b
 - **`title`**: optional.
 - **`description`**: optional. It's shown under the title, which makes it a good place for a link back to the conversation the list came from.
 - **`ordered`**: optional. When `true`, tasks are done in sequence: only the next unfinished task can be checked off, and the ones after it stay locked. Unchecking a step reopens it and every step after it.
-- **`tasks`**: an array of tasks. A task is a string, or `{ "text", "details" }` when it needs extra explanation. Details show in smaller, muted text, and the reader can hide them. Add `"done": true` to a task that is already complete and it starts out checked off (in an ordered list, done tasks must come before all others).
+- **`tasks`**: an array of tasks. A task is a string, or `{ "text", "details", "done" }` when it needs extra explanation or is already complete. Details show in smaller, muted text, and the reader can hide them. Add `"done": true` to a task that is already complete and it starts out checked off (in an ordered list, done tasks must come before all others).
 - **`sections`**: use this instead of `tasks` to group tasks under headings.
 - **Text** is plain, with two exceptions: `` `backtick` `` spans show as code, and web addresses (`http://` or `https://`) in task text, details and the description become links. Only the checkbox toggles a task, so clicking text, code or a link never checks it off.
 
@@ -90,6 +90,7 @@ Limits:
 | Opening a locally built link | One `GET /l/` for the page, which contains no task data. Nothing after that. |
 | Using `POST /api/lists` | One `POST` with the tasks; the response is the link. Nothing is stored or logged. |
 | Reopening `/l/<id>` | One `GET` for the page. The list stays in your browser. |
+| Copy share link | None. The link is built in your browser and copied to the clipboard; opening it somewhere else is the same as opening any other link. |
 | Clicking a link in a list | The linked site opens in a new tab, with no referrer, so it doesn't learn which list you came from. Nothing happens until you click. |
 
 ## How to verify
