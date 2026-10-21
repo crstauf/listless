@@ -134,7 +134,7 @@ After changing how the page looks, run `npm run screenshots` to recapture the RE
 
 ### Deploying from GitHub Actions
 
-`.github/workflows/deploy.yml` runs the checks on every push and pull request, and deploys on pushes to `master`. It needs two repository (or `production` environment) secrets:
+Two workflows live in `.github/workflows/`. `check.yml` runs the checks on every pull request and has no access to secrets. `deploy.yml` runs on pushes to `master`: it calls `check.yml` first, then deploys. The deploy needs two repository (or `production` environment) secrets:
 
 - `CLOUDFLARE_API_TOKEN`: an API token with the **Workers Scripts: Edit** permission
 - `CLOUDFLARE_ACCOUNT_ID`
