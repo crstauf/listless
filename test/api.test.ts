@@ -61,6 +61,39 @@ describe("POST /api/lists", () => {
 		expect(await decodeList(data.url!.split("#")[1])).toEqual({ v: 1, tasks: ["One"] });
 	});
 
+	it("keeps done on tasks and drops done: false", async () => {
+		const { res, data } = await createLink({
+			tasks: [{ text: "One", done: true }, { text: "Two", done: false }, { text: "Three", details: "d", done: true }],
+		});
+		expect(res.status).toBe(201);
+		expect(await decodeList(data.url!.split("#")[1])).toEqual({
+			v: 1,
+			tasks: [{ text: "One", done: true }, "Two", { text: "Three", details: "d", done: true }],
+		});
+	});
+
+	it("accepts done tasks first in an ordered list, across sections", async () => {
+		const { res } = await createLink({
+			ordered: true,
+			sections: [
+				{ title: "A", tasks: [{ text: "1", done: true }, { text: "2", done: true }] },
+				{ title: "B", tasks: [{ text: "3", done: true }, "4"] },
+			],
+		});
+		expect(res.status).toBe(201);
+	});
+
+	it.each([
+		["a non-boolean done", { tasks: [{ text: "a", done: "yes" }] }],
+		["a done task after an open one in an ordered list", { ordered: true, tasks: ["a", { text: "b", done: true }] }],
+		[
+			"a done task after an open one across ordered sections",
+			{ ordered: true, sections: [{ title: "A", tasks: ["a"] }, { title: "B", tasks: [{ text: "b", done: true }] }] },
+		],
+	])("rejects %s", async (_, body) => {
+		expect((await createLink(body)).res.status).toBe(400);
+	});
+
 	it("keeps 50 tasks to a reasonable link length", async () => {
 		const tasks = Array.from({ length: 50 }, (_, i) => `Task ${i + 1}: do the thing that needs doing next`);
 		const { data } = await createLink({ title: "Fifty", tasks });

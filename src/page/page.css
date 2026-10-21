@@ -528,6 +528,56 @@ h1 code {
 	font-size: 0.9375rem;
 }
 
+.notice button {
+	margin-left: 4px;
+	padding: 4px 12px;
+}
+
+/* ---- reordering ------------------------------------------------------------ */
+
+.tasks .handle {
+	flex: none;
+	align-self: center;
+	width: 32px;
+	height: 32px;
+	margin: -8px -8px -8px 0;
+	cursor: grab;
+	touch-action: none;
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+.tasks .handle svg {
+	fill: currentColor;
+	stroke: none;
+}
+
+@media (hover: hover) {
+	.tasks .handle {
+		opacity: 0;
+		transition: opacity 150ms;
+	}
+
+	.tasks .task:hover .handle,
+	.tasks .handle:focus-visible,
+	.tasks .dragging .handle {
+		opacity: 1;
+	}
+}
+
+.tasks .shifting:not(.dragging) {
+	transition: transform 150ms ease;
+}
+
+.tasks .dragging {
+	position: relative;
+	z-index: 1;
+	cursor: grabbing;
+	border-color: var(--accent);
+	box-shadow: var(--shadow-current);
+	transition: none;
+}
+
 .all-done {
 	margin: 32px 0 0;
 	text-align: center;
