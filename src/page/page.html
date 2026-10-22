@@ -31,9 +31,19 @@
 			<button type="button" id="toggle-upcoming" class="icon" aria-pressed="false" hidden>
 				<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3"/><path class="slash-gap" d="M4 4l16 16"/><path class="slash" d="M4 4l16 16"/></svg>
 			</button>
-			<button type="button" id="toggle-details" class="icon" aria-pressed="false" hidden>
-				<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 11h16M4 16h10"/><path class="slash-gap" d="M4 4l16 16"/><path class="slash" d="M4 4l16 16"/></svg>
-			</button>
+			<div class="menu" id="display-menu" hidden>
+				<button type="button" id="display" class="icon" aria-label="Display options" title="Display options" aria-haspopup="true" aria-expanded="false" aria-controls="display-pill">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><g class="lines"><path d="M4 5h16M4 9.5h10"/></g><g class="drawer-icon"><rect x="7" y="14" width="13" height="6" rx="2"/></g></svg>
+				</button>
+				<div class="pill" id="display-pill" role="group" aria-label="Display options">
+					<button type="button" id="toggle-details" class="icon" aria-pressed="false">
+						<svg viewBox="0 0 24 24" aria-hidden="true"><g class="lines"><path d="M4 8h16M4 13h10"/></g></svg>
+					</button>
+					<button type="button" id="toggle-copy" class="icon" aria-pressed="false">
+						<svg viewBox="0 0 24 24" aria-hidden="true"><g class="drawer-icon"><rect x="5" y="8" width="14" height="8" rx="2"/></g></svg>
+					</button>
+				</div>
+			</div>
 			<button type="button" id="reset" class="icon" aria-label="Uncheck all" title="Uncheck all">
 				<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4.5V9h4.5"/></svg>
 			</button>

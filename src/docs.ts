@@ -88,6 +88,16 @@ Errors return 400 (or 413 for an oversized body) with {"error": "..."}.
 
   Keep "text" short and actionable; put explanation, context or caveats in
   "details". The user can hide all details with one tap.
+  Add "copy" when the task hinges on one value the user will paste somewhere
+  else: an email address, phone number, account or order number,
+  confirmation code, street address, or a short phrase to type exactly. It
+  is shown on its own, exactly as written (no backticks or links), and
+  one tap selects all of it, and a button copies it. Keep the value alone, with no
+  label or explanation; those go in "text" or "details". Use backticks for
+  commands, file names and paths inside text instead.
+
+      {"text": "Email Dana the invoice", "copy": "dana@example.com"}
+
   Add "done": true to an object task that is already complete; it starts out
   checked off. In an ordered list, done tasks must come before all others.
 
@@ -123,6 +133,7 @@ click.
 
 - tasks: 1 to ${LIMITS.maxTasks} in total; task text at most ${LIMITS.maxTaskLength} characters
 - details: at most ${LIMITS.maxDetailsLength} characters
+- copy: at most ${LIMITS.maxCopyLength} characters
 - sections: 1 to ${LIMITS.maxSections}, each with a title and at least one task
 - titles (list and section): at most ${LIMITS.maxTitleLength} characters
 - description: at most ${LIMITS.maxDescriptionLength} characters

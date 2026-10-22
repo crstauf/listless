@@ -12,6 +12,7 @@
 	const MAX_SECTIONS = 50;
 	const MAX_TASK_LENGTH = 1000;
 	const MAX_DETAILS_LENGTH = 2000;
+	const MAX_COPY_LENGTH = 500;
 	const MAX_TITLE_LENGTH = 200;
 	const MAX_DESCRIPTION_LENGTH = 2000;
 
@@ -27,7 +28,10 @@
 		announce: $("announce"),
 		toggleDone: $("toggle-done"),
 		toggleUpcoming: $("toggle-upcoming"),
+		displayMenu: $("display-menu"),
+		display: $("display"),
 		toggleDetails: $("toggle-details"),
+		toggleCopy: $("toggle-copy"),
 		reset: $("reset"),
 		del: $("delete"),
 		notice: $("notice"),
@@ -41,8 +45,8 @@
 
 	let id = null;
 	let persistent = true;
-	// state: { title, description, ordered, sections: [{ title, tasks: [{ text, details }] }],
-	//          checked: number[], hideCompleted, hideUpcoming, hideDetails, createdAt }
+	// state: { title, description, ordered, sections: [{ title, tasks: [{ text, details, copy? }] }],
+	//          checked: number[], hideCompleted, hideUpcoming, hideDetails, hideCopy, createdAt }
 	// Task numbers in `checked` count across all sections, in order.
 	let state = null;
 	let rows = []; // one { li, box } per task, in the same order
@@ -53,10 +57,11 @@
 	const clip = (text, max) => text.trim().slice(0, max);
 
 	function normalizeTask(task) {
-		if (typeof task === "string" && task.trim()) return { text: clip(task, MAX_TASK_LENGTH), details: "", done: false };
+		if (typeof task === "string" && task.trim()) return { text: clip(task, MAX_TASK_LENGTH), details: "", copy: "", done: false };
 		if (task && typeof task === "object" && typeof task.text === "string" && task.text.trim()) {
 			const details = typeof task.details === "string" ? clip(task.details, MAX_DETAILS_LENGTH) : "";
-			return { text: clip(task.text, MAX_TASK_LENGTH), details, done: task.done === true };
+			const copy = typeof task.copy === "string" ? clip(task.copy, MAX_COPY_LENGTH) : "";
+			return { text: clip(task.text, MAX_TASK_LENGTH), details, copy, done: task.done === true };
 		}
 		return null;
 	}
@@ -102,7 +107,7 @@
 				if (task.done) initialChecked.push(index);
 				index++;
 			}
-			section.tasks = section.tasks.map(({ text, details }) => ({ text, details }));
+			section.tasks = section.tasks.map(({ text, details, copy }) => ({ text, details, ...(copy ? { copy } : {}) }));
 		}
 		if (ordered) initialChecked = leadingRun(initialChecked);
 
@@ -183,6 +188,7 @@
 			hideCompleted: value.hideCompleted === true,
 			hideUpcoming: value.hideUpcoming === true,
 			hideDetails: value.hideDetails === true,
+			hideCopy: value.hideCopy === true,
 			createdAt: typeof value.createdAt === "string" ? value.createdAt : new Date().toISOString(),
 		};
 	}
@@ -194,6 +200,7 @@
 			hideCompleted: false,
 			hideUpcoming: false,
 			hideDetails: false,
+			hideCopy: false,
 			createdAt: new Date().toISOString(),
 		};
 	}
@@ -317,6 +324,25 @@
 		return box;
 	}
 
+	// Same icon as the Copy as Markdown button: idle, then a check while flashing.
+	function copyIcon() {
+		const svg = document.createElementNS(SVG_NS, "svg");
+		const idle = document.createElementNS(SVG_NS, "g");
+		const rect = document.createElementNS(SVG_NS, "rect");
+		const back = document.createElementNS(SVG_NS, "path");
+		const check = document.createElementNS(SVG_NS, "path");
+		svg.setAttribute("viewBox", "0 0 24 24");
+		svg.setAttribute("aria-hidden", "true");
+		idle.setAttribute("class", "when-idle");
+		for (const [name, value] of Object.entries({ x: "9", y: "9", width: "12", height: "12", rx: "2" })) rect.setAttribute(name, value);
+		back.setAttribute("d", "M5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5");
+		check.setAttribute("class", "when-flash");
+		check.setAttribute("d", "M5 12.5l4.5 4.5L19 7.5");
+		idle.append(rect, back);
+		svg.append(idle, check);
+		return svg;
+	}
+
 	// Reordering starts from this handle only, so the task text stays selectable.
 	function dragHandle(label) {
 		const handle = el("button", "icon handle");
@@ -348,9 +374,13 @@
 		renderInline(els.description, state.description, true);
 		els.description.hidden = !state.description;
 
-		const hasDetails = state.sections.some((section) => section.tasks.some((task) => task.details));
 		els.toggleUpcoming.hidden = !state.ordered;
+		const hasDetails = state.sections.some((section) => section.tasks.some((task) => task.details));
+		const hasCopy = state.sections.some((section) => section.tasks.some((task) => task.copy));
+		els.displayMenu.hidden = !hasDetails && !hasCopy;
+		els.displayMenu.classList.toggle("single", hasDetails !== hasCopy);
 		els.toggleDetails.hidden = !hasDetails;
+		els.toggleCopy.hidden = !hasCopy;
 		els.list.classList.toggle("ordered", state.ordered);
 
 		rows = [];
@@ -373,6 +403,7 @@
 				// Only the checkbox toggles the task; the text is ordinary text
 				// that can be selected, and its links followed.
 				const li = el("li", "task");
+				const card = el("div", "card");
 				const label = el("label", "check");
 				const box = el("input");
 				const body = el("div", "body");
@@ -396,10 +427,32 @@
 					renderInline(details, task.details, true);
 					body.append(details);
 				}
+				// A value to paste elsewhere hangs below the card as a drawer.
+				let drawer = null;
+				if (task.copy) {
+					const value = el("span", "copy-value");
+					const button = el("button", "icon");
+					const copy = el("div", "copy");
+					drawer = el("div", "drawer");
+					value.id = `task-${index}-copy`;
+					value.textContent = task.copy;
+					box.setAttribute("aria-describedby", `${box.getAttribute("aria-describedby") || ""} ${value.id}`.trim());
+					button.type = "button";
+					button.setAttribute("aria-label", "Copy value");
+					button.title = "Copy value";
+					button.append(copyIcon());
+					button.addEventListener("click", async () => {
+						flash(button, (await copyText(task.copy)) ? "Copied" : "Copy failed");
+					});
+					copy.append(value, button);
+					drawer.append(copy);
+				}
 				label.append(box, checkmark());
-				li.append(label, body);
+				card.append(label, body);
+				li.append(card);
+				if (drawer) li.append(drawer);
 				list.append(li);
-				if (!state.ordered) li.append(dragHandle(task.text));
+				if (!state.ordered) card.append(dragHandle(task.text));
 				const row = { li, box, sectionIndex };
 				rows.push(row);
 				groupRows.push(row);
@@ -453,9 +506,13 @@
 		els.progressText.textContent = `${done} of ${total} done`;
 		els.progressFill.style.transform = `scaleX(${total ? done / total : 0})`;
 		els.list.classList.toggle("hide-details", state.hideDetails);
+		els.list.classList.toggle("hide-copy", state.hideCopy);
 		setToggle(els.toggleDone, state.hideCompleted, "Show completed", "Hide completed");
 		setToggle(els.toggleUpcoming, state.hideUpcoming, "Show upcoming", "Hide upcoming");
 		setToggle(els.toggleDetails, state.hideDetails, "Show details", "Hide details");
+		setToggle(els.toggleCopy, state.hideCopy, "Show copy text", "Hide copy text");
+		els.display.dataset.hideDetails = String(state.hideDetails);
+		els.display.dataset.hideCopy = String(state.hideCopy);
 
 		els.upcomingHidden.hidden = upcomingHidden === 0;
 		els.upcomingHidden.textContent =
@@ -523,9 +580,9 @@
 		update();
 	});
 
-	// One click selects a whole code span, ready to copy.
-	function selectCode(event) {
-		const code = event.target instanceof Element && event.target.closest("code");
+	// One click selects a whole code span or copy value, ready to copy.
+	function selectWhole(event) {
+		const code = event.target instanceof Element && event.target.closest("code, .copy-value");
 		if (!code) return;
 		event.preventDefault();
 		const range = document.createRange();
@@ -534,8 +591,8 @@
 		selection.removeAllRanges();
 		selection.addRange(range);
 	}
-	els.list.addEventListener("click", selectCode);
-	els.description.addEventListener("click", selectCode);
+	els.list.addEventListener("click", selectWhole);
+	els.description.addEventListener("click", selectWhole);
 
 	els.toggleDone.addEventListener("click", () => {
 		state.hideCompleted = !state.hideCompleted;
@@ -559,6 +616,28 @@
 		state.hideDetails = !state.hideDetails;
 		save();
 		update();
+	});
+
+	els.toggleCopy.addEventListener("click", () => {
+		state.hideCopy = !state.hideCopy;
+		save();
+		update();
+	});
+
+	// The display options appear on hover or keyboard focus. Tapping the button
+	// opens them too, for screens without hover.
+	function setMenuOpen(open) {
+		els.displayMenu.classList.toggle("open", open);
+		els.display.setAttribute("aria-expanded", String(open));
+	}
+	els.display.addEventListener("click", () => setMenuOpen(!els.displayMenu.classList.contains("open")));
+	document.addEventListener("click", (event) => {
+		if (!els.displayMenu.contains(event.target)) setMenuOpen(false);
+	});
+	els.displayMenu.addEventListener("keydown", (event) => {
+		if (event.key !== "Escape") return;
+		setMenuOpen(false);
+		els.display.focus();
 	});
 
 	els.reset.addEventListener("click", () => {
@@ -589,8 +668,13 @@
 		const sections = state.sections.map((section) => {
 			const tasks = section.tasks.map((task) => {
 				const done = checked.has(index++);
-				if (!task.details && !done) return task.text;
-				return { text: task.text, ...(task.details ? { details: task.details } : {}), ...(done ? { done: true } : {}) };
+				if (!task.details && !task.copy && !done) return task.text;
+				return {
+					text: task.text,
+					...(task.details ? { details: task.details } : {}),
+					...(task.copy ? { copy: task.copy } : {}),
+					...(done ? { done: true } : {}),
+				};
 			});
 			return { ...(section.title ? { title: section.title } : {}), tasks };
 		});
@@ -716,6 +800,13 @@
 				if (task.details) {
 					for (const line of task.details.split("\n")) lines.push(indent + line.trim());
 				}
+				if (task.copy) {
+					if (/[`\n]/.test(task.copy)) {
+						lines.push(indent + "```", ...task.copy.split("\n").map((line) => indent + line), indent + "```");
+					} else {
+						lines.push(indent + "`" + task.copy + "`");
+					}
+				}
 				index++;
 			}
 		}
@@ -782,7 +873,7 @@
 	// Tasks are matched by section and content, since the saved copy may have
 	// been reordered.
 	function offerLinkChecks(list) {
-		const key = (task) => task.text + "\0" + task.details;
+		const key = (task) => task.text + "\0" + task.details + "\0" + (task.copy || "");
 		const pending = state.sections.map((section) => {
 			const queues = new Map();
 			return { section, queues, add: (k, i) => queues.set(k, [...(queues.get(k) || []), i]) };

@@ -56,6 +56,16 @@ describe("POST /api/lists", () => {
 		});
 	});
 
+	it("keeps a trimmed copy value and drops a blank one", async () => {
+		const { data } = await createLink({
+			tasks: [{ text: "Email Dana", copy: " dana@example.com " }, { text: "One", copy: "  " }, { text: "Two", copy: "a\nb", details: "d" }],
+		});
+		expect(await decodeList(data.url!.split("#")[1])).toEqual({
+			v: 1,
+			tasks: [{ text: "Email Dana", copy: "dana@example.com" }, "One", { text: "Two", details: "d", copy: "a\nb" }],
+		});
+	});
+
 	it("omits ordered when false and blank details", async () => {
 		const { data } = await createLink({ ordered: false, tasks: [{ text: "One", details: "  " }] });
 		expect(await decodeList(data.url!.split("#")[1])).toEqual({ v: 1, tasks: ["One"] });
@@ -122,6 +132,8 @@ describe("POST /api/lists", () => {
 		["too many tasks across sections", JSON.stringify({ sections: Array(2).fill({ title: "s", tasks: Array(LIMITS.maxTasks / 2 + 1).fill("t") }) })],
 		["a task object without text", JSON.stringify({ tasks: [{ details: "d" }] })],
 		["details that are too long", JSON.stringify({ tasks: [{ text: "ok", details: "d".repeat(LIMITS.maxDetailsLength + 1) }] })],
+		["a copy value that is not a string", JSON.stringify({ tasks: [{ text: "ok", copy: 5 }] })],
+		["a copy value that is too long", JSON.stringify({ tasks: [{ text: "ok", copy: "c".repeat(LIMITS.maxCopyLength + 1) }] })],
 		["a non-boolean ordered", JSON.stringify({ ordered: "yes", tasks: ["ok"] })],
 	])("rejects %s with 400", async (_, body) => {
 		const res = await post("/api/lists", body);
