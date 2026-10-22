@@ -16,6 +16,8 @@
 	const MAX_TITLE_LENGTH = 200;
 	const MAX_DESCRIPTION_LENGTH = 2000;
 
+	const hoverable = matchMedia("(hover: hover)");
+
 	const $ = (id) => document.getElementById(id);
 	const els = {
 		bar: document.querySelector(".bar"),
@@ -325,23 +327,7 @@
 	}
 
 	// Same icon as the Copy as Markdown button: idle, then a check while flashing.
-	function copyIcon() {
-		const svg = document.createElementNS(SVG_NS, "svg");
-		const idle = document.createElementNS(SVG_NS, "g");
-		const rect = document.createElementNS(SVG_NS, "rect");
-		const back = document.createElementNS(SVG_NS, "path");
-		const check = document.createElementNS(SVG_NS, "path");
-		svg.setAttribute("viewBox", "0 0 24 24");
-		svg.setAttribute("aria-hidden", "true");
-		idle.setAttribute("class", "when-idle");
-		for (const [name, value] of Object.entries({ x: "9", y: "9", width: "12", height: "12", rx: "2" })) rect.setAttribute(name, value);
-		back.setAttribute("d", "M5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5");
-		check.setAttribute("class", "when-flash");
-		check.setAttribute("d", "M5 12.5l4.5 4.5L19 7.5");
-		idle.append(rect, back);
-		svg.append(idle, check);
-		return svg;
-	}
+	const copyIcon = () => els.copy.querySelector("svg").cloneNode(true);
 
 	// Reordering starts from this handle only, so the task text stays selectable.
 	function dragHandle(label) {
@@ -423,7 +409,6 @@
 				if (task.details) {
 					const details = el("span", "details");
 					details.id = `task-${index}-details`;
-					box.setAttribute("aria-describedby", details.id);
 					renderInline(details, task.details, true);
 					body.append(details);
 				}
@@ -436,7 +421,6 @@
 					drawer = el("div", "drawer");
 					value.id = `task-${index}-copy`;
 					value.textContent = task.copy;
-					box.setAttribute("aria-describedby", `${box.getAttribute("aria-describedby") || ""} ${value.id}`.trim());
 					button.type = "button";
 					button.setAttribute("aria-label", "Copy value");
 					button.title = "Copy value";
@@ -453,7 +437,13 @@
 				if (drawer) li.append(drawer);
 				list.append(li);
 				if (!state.ordered) card.append(dragHandle(task.text));
-				const row = { li, box, sectionIndex };
+				const row = {
+					li,
+					box,
+					sectionIndex,
+					detailsId: task.details ? `task-${index}-details` : "",
+					copyId: task.copy ? `task-${index}-copy` : "",
+				};
 				rows.push(row);
 				groupRows.push(row);
 			}
@@ -481,7 +471,7 @@
 		const current = currentIndex();
 		let upcomingHidden = 0;
 
-		rows.forEach(({ li, box }, index) => {
+		rows.forEach(({ li, box, detailsId, copyId }, index) => {
 			const isDone = checked.has(index);
 			const upcoming = state.ordered && !isDone && index !== current;
 			box.checked = isDone;
@@ -491,6 +481,10 @@
 			li.classList.toggle("upcoming", upcoming);
 			const hide = (isDone && state.hideCompleted) || (upcoming && state.hideUpcoming);
 			li.hidden = hide;
+			// Hidden details and copy values (and a done task's) aren't read out either.
+			const described = [state.hideDetails ? "" : detailsId, state.hideCopy || isDone ? "" : copyId].filter(Boolean).join(" ");
+			if (described) box.setAttribute("aria-describedby", described);
+			else box.removeAttribute("aria-describedby");
 			if (upcoming && state.hideUpcoming) upcomingHidden++;
 		});
 
@@ -511,13 +505,7 @@
 		setToggle(els.toggleUpcoming, state.hideUpcoming, "Show upcoming", "Hide upcoming");
 		setToggle(els.toggleDetails, state.hideDetails, "Show details", "Hide details");
 		setToggle(els.toggleCopy, state.hideCopy, "Show copy text", "Hide copy text");
-		const displayLabel = hoverable.matches
-			? state.hideDetails && state.hideCopy
-				? "Show details and copy text"
-				: "Hide details and copy text"
-			: "Display options";
-		els.display.setAttribute("aria-label", displayLabel);
-		els.display.title = displayLabel;
+		syncDisplayButton();
 		els.display.dataset.hideDetails = String(state.hideDetails);
 		els.display.dataset.hideCopy = String(state.hideCopy);
 
@@ -525,6 +513,24 @@
 		els.upcomingHidden.textContent =
 			upcomingHidden === 1 ? "1 upcoming task hidden · Show" : `${upcomingHidden} upcoming tasks hidden · Show`;
 		els.allDone.hidden = !(done === total && total > 0);
+	}
+
+	// With hover, the Display button toggles details and copy text together, and its
+	// label says which way. Without it, the button opens the options, so it's a menu
+	// button instead. It has no aria-pressed: that would give it the pressed circle.
+	function syncDisplayButton() {
+		const button = els.display;
+		let label = "Display options";
+		if (hoverable.matches) {
+			label = state.hideDetails && state.hideCopy ? "Show details and copy text" : "Hide details and copy text";
+			button.removeAttribute("aria-haspopup");
+			button.removeAttribute("aria-expanded");
+		} else {
+			button.setAttribute("aria-haspopup", "true");
+			button.setAttribute("aria-expanded", String(els.displayMenu.classList.contains("open")));
+		}
+		button.setAttribute("aria-label", label);
+		button.title = label;
 	}
 
 	function setToggle(button, pressed, pressedLabel, label) {
@@ -635,26 +641,41 @@
 	// opens them too, for screens without hover.
 	function setMenuOpen(open) {
 		els.displayMenu.classList.toggle("open", open);
-		els.display.setAttribute("aria-expanded", String(open));
+		if (open) els.displayMenu.classList.remove("dismissed");
+		syncDisplayButton();
 	}
-	// With a pointer, clicking the button hides both parts (or shows both once
-	// they're all hidden). Without one, it opens the options.
-	const hoverable = matchMedia("(hover: hover)");
-	els.display.addEventListener("click", () => {
-		if (!hoverable.matches) return setMenuOpen(!els.displayMenu.classList.contains("open"));
+	// With a mouse, clicking the button hides both parts (or shows both once
+	// they're all hidden). A tap, or a device without hover, opens the options.
+	els.display.addEventListener("click", (event) => {
+		if (!hoverable.matches || event.pointerType === "touch" || event.pointerType === "pen") {
+			return setMenuOpen(!els.displayMenu.classList.contains("open"));
+		}
 		const hide = !state.hideDetails || !state.hideCopy;
 		state.hideDetails = hide;
 		state.hideCopy = hide;
 		save();
 		update();
 	});
+	hoverable.addEventListener("change", () => {
+		setMenuOpen(false);
+		if (state) update();
+	});
 	document.addEventListener("click", (event) => {
 		if (!els.displayMenu.contains(event.target)) setMenuOpen(false);
 	});
+	// Escape closes the options even though the button keeps focus, which would
+	// otherwise hold them open; they come back once focus or the pointer leaves.
 	els.displayMenu.addEventListener("keydown", (event) => {
 		if (event.key !== "Escape") return;
 		setMenuOpen(false);
+		els.displayMenu.classList.add("dismissed");
 		els.display.focus();
+	});
+	els.displayMenu.addEventListener("focusout", (event) => {
+		if (!els.displayMenu.contains(event.relatedTarget)) els.displayMenu.classList.remove("dismissed");
+	});
+	els.displayMenu.addEventListener("pointerleave", () => {
+		if (!els.displayMenu.contains(document.activeElement)) els.displayMenu.classList.remove("dismissed");
 	});
 
 	els.reset.addEventListener("click", () => {
@@ -758,6 +779,9 @@
 		const { sectionIndex, view, from } = rowPosition(handle);
 		const visible = view.rows.filter(({ li }) => !li.hidden);
 		const self = visible.findIndex((row) => row === view.rows[from]);
+		// Mark the rows before measuring them: .shifting snaps a peeked-open drawer
+		// shut, so the measurements match the layout the drag will move through.
+		for (const { li } of visible) li.classList.add("shifting");
 		const rects = visible.map(({ li }) => li.getBoundingClientRect());
 		const gap = rects.length > 1 ? Math.max(0, rects[1].top - rects[0].bottom) : 8;
 		const shift = rects[self].height + gap;
@@ -767,7 +791,6 @@
 		handle.setPointerCapture(event.pointerId);
 		const dragged = visible[self].li;
 		dragged.classList.add("dragging");
-		for (const { li } of visible) li.classList.add("shifting");
 
 		const place = () => {
 			visible.forEach(({ li }, k) => {
@@ -818,8 +841,11 @@
 					for (const line of task.details.split("\n")) lines.push(indent + line.trim());
 				}
 				if (task.copy) {
+					// A fence or span longer than any backtick run in the value can't be closed early by it.
+					const ticks = (min) => "`".repeat(Math.max(min, ...(task.copy.match(/`+/g) || []).map((run) => run.length + 1)));
 					if (/[`\n]/.test(task.copy)) {
-						lines.push(indent + "```", ...task.copy.split("\n").map((line) => indent + line), indent + "```");
+						const fence = ticks(3);
+						lines.push(indent + fence, ...task.copy.split("\n").map((line) => indent + line), indent + fence);
 					} else {
 						lines.push(indent + "`" + task.copy + "`");
 					}

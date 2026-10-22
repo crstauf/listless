@@ -284,26 +284,29 @@ button.icon .slash-gap {
 }
 
 .menu.open .pill,
-.menu:has(:focus-visible) .pill {
+.menu:not(.dismissed):has(:focus-visible) .pill {
 	opacity: 1;
 	visibility: visible;
 	transition-delay: 0s;
 }
 
 @media (hover: hover) {
-	.menu:hover .pill {
+	.menu:not(.dismissed):hover .pill {
 		opacity: 1;
 		visibility: visible;
 		transition-delay: 0s;
 	}
 }
 
+/* Escape (.dismissed) closes the pill even though the button keeps focus, until
+   the focus or pointer leaves the menu. */
+
 /* Tapped or focused open, the button stays in its hover color and drops its
    hover circle, which would clash with the pill. With a pointer, the button
    keeps its own hover effect (a click toggles both parts): a fill like the
    options below it, running down to the divider. */
 .menu.open > button,
-.menu:has(:focus-visible) > button {
+.menu:not(.dismissed):has(:focus-visible) > button {
 	background: transparent;
 	border-color: transparent;
 	color: var(--text);
@@ -829,6 +832,12 @@ h1 code {
 
 .tasks .shifting:not(.dragging) {
 	transition: transform 150ms ease;
+}
+
+/* Grabbing a handle ends any peek at once, so the rows hold still while dragged. */
+.tasks .shifting .drawer,
+.tasks .shifting .copy {
+	transition: none;
 }
 
 .tasks .dragging {
