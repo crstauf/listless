@@ -249,6 +249,9 @@ button.icon .slash-gap {
 .menu > button {
 	position: relative;
 	z-index: 3;
+	/* The hover fill changes shape (circle to pill section), so it must not
+	   fade out, or it flashes as a circle when the pointer leaves. */
+	transition: color 150ms;
 }
 
 .menu .pill {
@@ -295,11 +298,23 @@ button.icon .slash-gap {
 	}
 }
 
-/* Open, the button's own hover circle would clash with the pill. */
+/* Tapped or focused open, the button stays in its hover color and drops its
+   hover circle, which would clash with the pill. With a pointer, the button
+   keeps its own hover effect (a click toggles both parts): a fill like the
+   options below it, running down to the divider. */
 .menu.open > button,
-.menu:hover > button {
+.menu:has(:focus-visible) > button {
 	background: transparent;
 	border-color: transparent;
+	color: var(--text);
+}
+
+@media (hover: hover) {
+	.menu > button:hover {
+		background: var(--code-bg);
+		border-color: transparent;
+		border-radius: 20px 20px 0 0;
+	}
 }
 
 /* No fill for hidden parts: the dimmed, dashed icon says it. The options fill
@@ -491,10 +506,6 @@ main {
 	display: none;
 }
 
-.hide-copy .tasks .drawer {
-	display: none;
-}
-
 /* A value to paste elsewhere hangs below its card as a drawer, indented to
    line up with the task text and darker than the card. One click on the value
    selects all of it, and the button copies it. Completing the task slides the
@@ -534,6 +545,18 @@ main {
 	transform: translateY(-100%);
 }
 
+/* Hidden copy values collapse like a done task's drawer. On hover they slide
+   back out for a peek (see the hover media query below). */
+.hide-copy .tasks .drawer {
+	grid-template-rows: minmax(0, 0fr);
+	visibility: hidden;
+	transition: grid-template-rows 250ms ease, visibility 0s 250ms;
+}
+
+.hide-copy .tasks .copy {
+	transform: translateY(-100%);
+}
+
 .tasks .copy-value {
 	flex: 1;
 	min-width: 0;
@@ -555,6 +578,12 @@ main {
 .tasks .copy button.icon svg {
 	width: 16px;
 	height: 16px;
+}
+
+/* Hovering only changes the icon's color, with no circle behind it. */
+.tasks .copy button.icon:hover {
+	background: transparent;
+	border-color: transparent;
 }
 
 .tasks .upcoming .copy {
@@ -747,6 +776,45 @@ h1 code {
 }
 
 @media (hover: hover) {
+	/* Hidden details and copy values peek out while their task is hovered. The
+	   300ms delay stops a pointer sweeping down the list from opening every card
+	   it crosses; closing is immediate. Not while dragging (.shifting), and not
+	   for done tasks (details included). */
+	.hide-details .tasks .task:not(.done, .shifting):hover .details {
+		display: block;
+		animation: peek 0s 300ms backwards;
+	}
+
+	@keyframes peek {
+		from {
+			display: none;
+		}
+	}
+
+	.hide-copy .tasks .task:not(.done, .shifting):hover .drawer {
+		grid-template-rows: minmax(0, 1fr);
+		visibility: visible;
+		transition: grid-template-rows 250ms ease 300ms, visibility 0s 300ms;
+	}
+
+	.hide-copy .tasks .task:not(.done, .shifting):hover .copy {
+		transform: none;
+		transition: transform 250ms ease 300ms, opacity 200ms;
+	}
+
+	/* The copy button only shows while its task is hovered, focused or just
+	   used (so the "Copied" check stays visible). */
+	.tasks .copy button.icon {
+		opacity: 0;
+		transition: opacity 150ms;
+	}
+
+	.tasks .task:hover .copy button.icon,
+	.tasks .copy button.icon:focus-visible,
+	.tasks .copy button.icon.flash {
+		opacity: 1;
+	}
+
 	.tasks .handle {
 		opacity: 0;
 		transition: opacity 150ms;

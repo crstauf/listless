@@ -511,6 +511,13 @@
 		setToggle(els.toggleUpcoming, state.hideUpcoming, "Show upcoming", "Hide upcoming");
 		setToggle(els.toggleDetails, state.hideDetails, "Show details", "Hide details");
 		setToggle(els.toggleCopy, state.hideCopy, "Show copy text", "Hide copy text");
+		const displayLabel = hoverable.matches
+			? state.hideDetails && state.hideCopy
+				? "Show details and copy text"
+				: "Hide details and copy text"
+			: "Display options";
+		els.display.setAttribute("aria-label", displayLabel);
+		els.display.title = displayLabel;
 		els.display.dataset.hideDetails = String(state.hideDetails);
 		els.display.dataset.hideCopy = String(state.hideCopy);
 
@@ -630,7 +637,17 @@
 		els.displayMenu.classList.toggle("open", open);
 		els.display.setAttribute("aria-expanded", String(open));
 	}
-	els.display.addEventListener("click", () => setMenuOpen(!els.displayMenu.classList.contains("open")));
+	// With a pointer, clicking the button hides both parts (or shows both once
+	// they're all hidden). Without one, it opens the options.
+	const hoverable = matchMedia("(hover: hover)");
+	els.display.addEventListener("click", () => {
+		if (!hoverable.matches) return setMenuOpen(!els.displayMenu.classList.contains("open"));
+		const hide = !state.hideDetails || !state.hideCopy;
+		state.hideDetails = hide;
+		state.hideCopy = hide;
+		save();
+		update();
+	});
 	document.addEventListener("click", (event) => {
 		if (!els.displayMenu.contains(event.target)) setMenuOpen(false);
 	});
