@@ -12,8 +12,11 @@
 	const MAX_SECTIONS = 50;
 	const MAX_TASK_LENGTH = 1000;
 	const MAX_DETAILS_LENGTH = 2000;
+	const MAX_COPY_LENGTH = 500;
 	const MAX_TITLE_LENGTH = 200;
 	const MAX_DESCRIPTION_LENGTH = 2000;
+
+	const hoverable = matchMedia("(hover: hover)");
 
 	const $ = (id) => document.getElementById(id);
 	const els = {
@@ -27,7 +30,10 @@
 		announce: $("announce"),
 		toggleDone: $("toggle-done"),
 		toggleUpcoming: $("toggle-upcoming"),
+		displayMenu: $("display-menu"),
+		display: $("display"),
 		toggleDetails: $("toggle-details"),
+		toggleCopy: $("toggle-copy"),
 		reset: $("reset"),
 		del: $("delete"),
 		notice: $("notice"),
@@ -41,8 +47,8 @@
 
 	let id = null;
 	let persistent = true;
-	// state: { title, description, ordered, sections: [{ title, tasks: [{ text, details }] }],
-	//          checked: number[], hideCompleted, hideUpcoming, hideDetails, createdAt }
+	// state: { title, description, ordered, sections: [{ title, tasks: [{ text, details, copy? }] }],
+	//          checked: number[], hideCompleted, hideUpcoming, hideDetails, hideCopy, createdAt }
 	// Task numbers in `checked` count across all sections, in order.
 	let state = null;
 	let rows = []; // one { li, box } per task, in the same order
@@ -53,10 +59,11 @@
 	const clip = (text, max) => text.trim().slice(0, max);
 
 	function normalizeTask(task) {
-		if (typeof task === "string" && task.trim()) return { text: clip(task, MAX_TASK_LENGTH), details: "", done: false };
+		if (typeof task === "string" && task.trim()) return { text: clip(task, MAX_TASK_LENGTH), details: "", copy: "", done: false };
 		if (task && typeof task === "object" && typeof task.text === "string" && task.text.trim()) {
 			const details = typeof task.details === "string" ? clip(task.details, MAX_DETAILS_LENGTH) : "";
-			return { text: clip(task.text, MAX_TASK_LENGTH), details, done: task.done === true };
+			const copy = typeof task.copy === "string" ? clip(task.copy, MAX_COPY_LENGTH) : "";
+			return { text: clip(task.text, MAX_TASK_LENGTH), details, copy, done: task.done === true };
 		}
 		return null;
 	}
@@ -102,7 +109,7 @@
 				if (task.done) initialChecked.push(index);
 				index++;
 			}
-			section.tasks = section.tasks.map(({ text, details }) => ({ text, details }));
+			section.tasks = section.tasks.map(({ text, details, copy }) => ({ text, details, ...(copy ? { copy } : {}) }));
 		}
 		if (ordered) initialChecked = leadingRun(initialChecked);
 
@@ -183,6 +190,7 @@
 			hideCompleted: value.hideCompleted === true,
 			hideUpcoming: value.hideUpcoming === true,
 			hideDetails: value.hideDetails === true,
+			hideCopy: value.hideCopy === true,
 			createdAt: typeof value.createdAt === "string" ? value.createdAt : new Date().toISOString(),
 		};
 	}
@@ -194,6 +202,7 @@
 			hideCompleted: false,
 			hideUpcoming: false,
 			hideDetails: false,
+			hideCopy: false,
 			createdAt: new Date().toISOString(),
 		};
 	}
@@ -317,6 +326,9 @@
 		return box;
 	}
 
+	// Same icon as the Copy as Markdown button: idle, then a check while flashing.
+	const copyIcon = () => els.copy.querySelector("svg").cloneNode(true);
+
 	// Reordering starts from this handle only, so the task text stays selectable.
 	function dragHandle(label) {
 		const handle = el("button", "icon handle");
@@ -348,9 +360,13 @@
 		renderInline(els.description, state.description, true);
 		els.description.hidden = !state.description;
 
-		const hasDetails = state.sections.some((section) => section.tasks.some((task) => task.details));
 		els.toggleUpcoming.hidden = !state.ordered;
+		const hasDetails = state.sections.some((section) => section.tasks.some((task) => task.details));
+		const hasCopy = state.sections.some((section) => section.tasks.some((task) => task.copy));
+		els.displayMenu.hidden = !hasDetails && !hasCopy;
+		els.displayMenu.classList.toggle("single", hasDetails !== hasCopy);
 		els.toggleDetails.hidden = !hasDetails;
+		els.toggleCopy.hidden = !hasCopy;
 		els.list.classList.toggle("ordered", state.ordered);
 
 		rows = [];
@@ -373,6 +389,7 @@
 				// Only the checkbox toggles the task; the text is ordinary text
 				// that can be selected, and its links followed.
 				const li = el("li", "task");
+				const card = el("div", "card");
 				const label = el("label", "check");
 				const box = el("input");
 				const body = el("div", "body");
@@ -392,15 +409,41 @@
 				if (task.details) {
 					const details = el("span", "details");
 					details.id = `task-${index}-details`;
-					box.setAttribute("aria-describedby", details.id);
 					renderInline(details, task.details, true);
 					body.append(details);
 				}
+				// A value to paste elsewhere hangs below the card as a drawer.
+				let drawer = null;
+				if (task.copy) {
+					const value = el("span", "copy-value");
+					const button = el("button", "icon");
+					const copy = el("div", "copy");
+					drawer = el("div", "drawer");
+					value.id = `task-${index}-copy`;
+					value.textContent = task.copy;
+					button.type = "button";
+					button.setAttribute("aria-label", "Copy value");
+					button.title = "Copy value";
+					button.append(copyIcon());
+					button.addEventListener("click", async () => {
+						flash(button, (await copyText(task.copy)) ? "Copied" : "Copy failed");
+					});
+					copy.append(value, button);
+					drawer.append(copy);
+				}
 				label.append(box, checkmark());
-				li.append(label, body);
+				card.append(label, body);
+				li.append(card);
+				if (drawer) li.append(drawer);
 				list.append(li);
-				if (!state.ordered) li.append(dragHandle(task.text));
-				const row = { li, box, sectionIndex };
+				if (!state.ordered) card.append(dragHandle(task.text));
+				const row = {
+					li,
+					box,
+					sectionIndex,
+					detailsId: task.details ? `task-${index}-details` : "",
+					copyId: task.copy ? `task-${index}-copy` : "",
+				};
 				rows.push(row);
 				groupRows.push(row);
 			}
@@ -428,7 +471,7 @@
 		const current = currentIndex();
 		let upcomingHidden = 0;
 
-		rows.forEach(({ li, box }, index) => {
+		rows.forEach(({ li, box, detailsId, copyId }, index) => {
 			const isDone = checked.has(index);
 			const upcoming = state.ordered && !isDone && index !== current;
 			box.checked = isDone;
@@ -438,6 +481,10 @@
 			li.classList.toggle("upcoming", upcoming);
 			const hide = (isDone && state.hideCompleted) || (upcoming && state.hideUpcoming);
 			li.hidden = hide;
+			// Hidden details and copy values (and a done task's) aren't read out either.
+			const described = [state.hideDetails ? "" : detailsId, state.hideCopy || isDone ? "" : copyId].filter(Boolean).join(" ");
+			if (described) box.setAttribute("aria-describedby", described);
+			else box.removeAttribute("aria-describedby");
 			if (upcoming && state.hideUpcoming) upcomingHidden++;
 		});
 
@@ -453,14 +500,37 @@
 		els.progressText.textContent = `${done} of ${total} done`;
 		els.progressFill.style.transform = `scaleX(${total ? done / total : 0})`;
 		els.list.classList.toggle("hide-details", state.hideDetails);
+		els.list.classList.toggle("hide-copy", state.hideCopy);
 		setToggle(els.toggleDone, state.hideCompleted, "Show completed", "Hide completed");
 		setToggle(els.toggleUpcoming, state.hideUpcoming, "Show upcoming", "Hide upcoming");
 		setToggle(els.toggleDetails, state.hideDetails, "Show details", "Hide details");
+		setToggle(els.toggleCopy, state.hideCopy, "Show copy text", "Hide copy text");
+		syncDisplayButton();
+		els.display.dataset.hideDetails = String(state.hideDetails);
+		els.display.dataset.hideCopy = String(state.hideCopy);
 
 		els.upcomingHidden.hidden = upcomingHidden === 0;
 		els.upcomingHidden.textContent =
 			upcomingHidden === 1 ? "1 upcoming task hidden · Show" : `${upcomingHidden} upcoming tasks hidden · Show`;
 		els.allDone.hidden = !(done === total && total > 0);
+	}
+
+	// With hover, the Display button toggles details and copy text together, and its
+	// label says which way. Without it, the button opens the options, so it's a menu
+	// button instead. It has no aria-pressed: that would give it the pressed circle.
+	function syncDisplayButton() {
+		const button = els.display;
+		let label = "Display options";
+		if (hoverable.matches) {
+			label = state.hideDetails && state.hideCopy ? "Show details and copy text" : "Hide details and copy text";
+			button.removeAttribute("aria-haspopup");
+			button.removeAttribute("aria-expanded");
+		} else {
+			button.setAttribute("aria-haspopup", "true");
+			button.setAttribute("aria-expanded", String(els.displayMenu.classList.contains("open")));
+		}
+		button.setAttribute("aria-label", label);
+		button.title = label;
 	}
 
 	function setToggle(button, pressed, pressedLabel, label) {
@@ -523,9 +593,9 @@
 		update();
 	});
 
-	// One click selects a whole code span, ready to copy.
-	function selectCode(event) {
-		const code = event.target instanceof Element && event.target.closest("code");
+	// One click selects a whole code span or copy value, ready to copy.
+	function selectWhole(event) {
+		const code = event.target instanceof Element && event.target.closest("code, .copy-value");
 		if (!code) return;
 		event.preventDefault();
 		const range = document.createRange();
@@ -534,8 +604,8 @@
 		selection.removeAllRanges();
 		selection.addRange(range);
 	}
-	els.list.addEventListener("click", selectCode);
-	els.description.addEventListener("click", selectCode);
+	els.list.addEventListener("click", selectWhole);
+	els.description.addEventListener("click", selectWhole);
 
 	els.toggleDone.addEventListener("click", () => {
 		state.hideCompleted = !state.hideCompleted;
@@ -559,6 +629,53 @@
 		state.hideDetails = !state.hideDetails;
 		save();
 		update();
+	});
+
+	els.toggleCopy.addEventListener("click", () => {
+		state.hideCopy = !state.hideCopy;
+		save();
+		update();
+	});
+
+	// The display options appear on hover or keyboard focus. Tapping the button
+	// opens them too, for screens without hover.
+	function setMenuOpen(open) {
+		els.displayMenu.classList.toggle("open", open);
+		if (open) els.displayMenu.classList.remove("dismissed");
+		syncDisplayButton();
+	}
+	// With a mouse, clicking the button hides both parts (or shows both once
+	// they're all hidden). A tap, or a device without hover, opens the options.
+	els.display.addEventListener("click", (event) => {
+		if (!hoverable.matches || event.pointerType === "touch" || event.pointerType === "pen") {
+			return setMenuOpen(!els.displayMenu.classList.contains("open"));
+		}
+		const hide = !state.hideDetails || !state.hideCopy;
+		state.hideDetails = hide;
+		state.hideCopy = hide;
+		save();
+		update();
+	});
+	hoverable.addEventListener("change", () => {
+		setMenuOpen(false);
+		if (state) update();
+	});
+	document.addEventListener("click", (event) => {
+		if (!els.displayMenu.contains(event.target)) setMenuOpen(false);
+	});
+	// Escape closes the options even though the button keeps focus, which would
+	// otherwise hold them open; they come back once focus or the pointer leaves.
+	els.displayMenu.addEventListener("keydown", (event) => {
+		if (event.key !== "Escape") return;
+		setMenuOpen(false);
+		els.displayMenu.classList.add("dismissed");
+		els.display.focus();
+	});
+	els.displayMenu.addEventListener("focusout", (event) => {
+		if (!els.displayMenu.contains(event.relatedTarget)) els.displayMenu.classList.remove("dismissed");
+	});
+	els.displayMenu.addEventListener("pointerleave", () => {
+		if (!els.displayMenu.contains(document.activeElement)) els.displayMenu.classList.remove("dismissed");
 	});
 
 	els.reset.addEventListener("click", () => {
@@ -589,8 +706,13 @@
 		const sections = state.sections.map((section) => {
 			const tasks = section.tasks.map((task) => {
 				const done = checked.has(index++);
-				if (!task.details && !done) return task.text;
-				return { text: task.text, ...(task.details ? { details: task.details } : {}), ...(done ? { done: true } : {}) };
+				if (!task.details && !task.copy && !done) return task.text;
+				return {
+					text: task.text,
+					...(task.details ? { details: task.details } : {}),
+					...(task.copy ? { copy: task.copy } : {}),
+					...(done ? { done: true } : {}),
+				};
 			});
 			return { ...(section.title ? { title: section.title } : {}), tasks };
 		});
@@ -657,6 +779,9 @@
 		const { sectionIndex, view, from } = rowPosition(handle);
 		const visible = view.rows.filter(({ li }) => !li.hidden);
 		const self = visible.findIndex((row) => row === view.rows[from]);
+		// Mark the rows before measuring them: .shifting snaps a peeked-open drawer
+		// shut, so the measurements match the layout the drag will move through.
+		for (const { li } of visible) li.classList.add("shifting");
 		const rects = visible.map(({ li }) => li.getBoundingClientRect());
 		const gap = rects.length > 1 ? Math.max(0, rects[1].top - rects[0].bottom) : 8;
 		const shift = rects[self].height + gap;
@@ -666,7 +791,6 @@
 		handle.setPointerCapture(event.pointerId);
 		const dragged = visible[self].li;
 		dragged.classList.add("dragging");
-		for (const { li } of visible) li.classList.add("shifting");
 
 		const place = () => {
 			visible.forEach(({ li }, k) => {
@@ -715,6 +839,16 @@
 				lines.push(`${marker} [${checked.has(index) ? "x" : " "}] ${oneLine(task.text)}`);
 				if (task.details) {
 					for (const line of task.details.split("\n")) lines.push(indent + line.trim());
+				}
+				if (task.copy) {
+					// A fence or span longer than any backtick run in the value can't be closed early by it.
+					const ticks = (min) => "`".repeat(Math.max(min, ...(task.copy.match(/`+/g) || []).map((run) => run.length + 1)));
+					if (/[`\n]/.test(task.copy)) {
+						const fence = ticks(3);
+						lines.push(indent + fence, ...task.copy.split("\n").map((line) => indent + line), indent + fence);
+					} else {
+						lines.push(indent + "`" + task.copy + "`");
+					}
 				}
 				index++;
 			}
@@ -782,7 +916,7 @@
 	// Tasks are matched by section and content, since the saved copy may have
 	// been reordered.
 	function offerLinkChecks(list) {
-		const key = (task) => task.text + "\0" + task.details;
+		const key = (task) => task.text + "\0" + task.details + "\0" + (task.copy || "");
 		const pending = state.sections.map((section) => {
 			const queues = new Map();
 			return { section, queues, add: (k, i) => queues.set(k, [...(queues.get(k) || []), i]) };

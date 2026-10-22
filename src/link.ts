@@ -7,6 +7,7 @@ export const LIMITS = {
 	maxSections: 50,
 	maxTaskLength: 1_000,
 	maxDetailsLength: 2_000,
+	maxCopyLength: 500,
 	maxTitleLength: 200,
 	maxDescriptionLength: 2_000,
 	maxBodyBytes: 256 * 1024,
@@ -15,9 +16,10 @@ export const LIMITS = {
 export const FORMAT_PREFIX = "v1.";
 
 // A task is plain text, or text plus muted details. Backtick spans in any text
-// are shown as code on the page; nothing else is interpreted. `done` marks a
-// task that starts out checked off.
-export type Task = string | { text: string; details?: string; done?: true };
+// are shown as code on the page; nothing else is interpreted. `copy` is one
+// value the user will paste elsewhere, shown literally with a copy button.
+// `done` marks a task that starts out checked off.
+export type Task = string | { text: string; details?: string; copy?: string; done?: true };
 
 export interface Section {
 	title: string;
@@ -125,8 +127,14 @@ function cleanTask(task: unknown, path: string): Task {
 	if (task.done !== undefined && typeof task.done !== "boolean") {
 		throw new InvalidList(`"${path}.done" must be true or false when present.`);
 	}
-	if (!details && !task.done) return text;
-	return { text, ...(details ? { details } : {}), ...(task.done ? { done: true as const } : {}) };
+	const copy = optionalText(task.copy, `${path}.copy`, LIMITS.maxCopyLength);
+	if (!details && !copy && !task.done) return text;
+	return {
+		text,
+		...(details ? { details } : {}),
+		...(copy ? { copy } : {}),
+		...(task.done ? { done: true as const } : {}),
+	};
 }
 
 function requiredText(value: unknown, path: string, max: number): string {
