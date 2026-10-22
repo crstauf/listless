@@ -36,5 +36,5 @@ jobs:
 
       - name: Test the page in a browser
         run: |
-          npx playwright install --with-deps chromium
+          npx playwright install chromium
           npm run test:page
