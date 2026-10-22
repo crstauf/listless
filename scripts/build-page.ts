@@ -1,6 +1,8 @@
 // Inlines src/page/page.css and src/page/page.js into src/page/page.html,
 // computes the SHA-256 hashes the Content-Security-Policy needs to allow
-// exactly that script and style, and writes src/page.generated.ts.
+// exactly that script and style, and writes src/page.generated.ts. The limits
+// from src/limits.ts are copied into the script first, so the page and the
+// Worker enforce the same ones.
 //
 // The generated file is committed so the deployed page can be reviewed in the
 // repo; CI rebuilds it and fails if it differs.

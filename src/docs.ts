@@ -13,7 +13,8 @@ Turn a list of tasks into a checklist page that lives only in the user's browser
   Worker, not in any database or cache, not in logs, and not with any third
   party. There are no accounts and no syncing.
 - Deleting a list, or clearing this site's data in the browser, removes it
-  for good. Opening the original link again imports a fresh copy.
+  for good (Delete can be undone only right away). Opening the original link
+  again imports a fresh copy.
 - ${origin}/l/ (with nothing after it) lists every list saved in the user's
   browser, so they can find or delete one.
 - The checklist page's Content-Security-Policy forbids it from making any
