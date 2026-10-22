@@ -215,7 +215,8 @@ button.icon svg {
 /* Toggles strike through their icon while they're hiding things. */
 button.icon .slash,
 button.icon .slash-gap,
-button.icon .when-flash {
+button.icon .when-flash,
+button.icon .when-armed {
 	display: none;
 }
 
@@ -375,6 +376,22 @@ button.icon.flash .when-idle {
 button.icon.flash .when-flash {
 	display: inline;
 	stroke: var(--accent);
+	stroke-width: 2.25;
+}
+
+/* A destructive button waits for a second click: red, with a check mark. */
+button.icon.armed {
+	background: var(--danger-soft);
+	border-color: transparent;
+	color: var(--danger);
+}
+
+button.icon.armed .when-idle {
+	display: none;
+}
+
+button.icon.armed .when-armed {
+	display: inline;
 	stroke-width: 2.25;
 }
 
@@ -638,6 +655,12 @@ main {
 	stroke-dashoffset: 0;
 }
 
+/* A step waiting for a second uncheck to reopen the steps after it. */
+.tasks .armed input:checked + .box {
+	background: var(--danger);
+	border-color: var(--danger);
+}
+
 @keyframes pop {
 	0% { transform: scale(1); }
 	40% { transform: scale(0.85); }
@@ -882,10 +905,97 @@ h1 code {
 	text-align: center;
 }
 
+#message-action {
+	margin-top: 20px;
+}
+
+.toast {
+	position: fixed;
+	left: 50%;
+	bottom: 20px;
+	z-index: 3;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	max-width: calc(100% - 32px);
+	padding: 8px 8px 8px 18px;
+	border-radius: 999px;
+	background: var(--text);
+	color: var(--bg);
+	font-size: 0.9375rem;
+	box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
+	transform: translateX(-50%);
+}
+
+.toast button {
+	flex: none;
+	padding: 6px 16px;
+	background: transparent;
+	color: inherit;
+	font-weight: 600;
+	border-color: color-mix(in srgb, currentColor 40%, transparent);
+}
+
+.toast button:hover {
+	border-color: currentColor;
+}
+
 .message p {
 	color: var(--muted);
 	max-width: 32rem;
 	margin: 12px auto 0;
+}
+
+/* ---- index of saved lists ------------------------------------------------- */
+
+.index h1 {
+	margin-bottom: 20px;
+}
+
+.index ul {
+	display: grid;
+	gap: 8px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.index li {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 8px 10px 16px;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	box-shadow: var(--shadow);
+}
+
+.index li:hover {
+	border-color: var(--border-strong);
+}
+
+.index .entry {
+	flex: 1;
+	min-width: 0;
+	display: grid;
+	gap: 2px;
+}
+
+.index .entry a {
+	font-weight: 600;
+	text-decoration: none;
+	overflow-wrap: anywhere;
+}
+
+.index .entry a:hover {
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.index .entry span {
+	color: var(--muted);
+	font-size: 0.8125rem;
 }
 
 footer {
@@ -922,6 +1032,55 @@ a {
 
 	.actions {
 		margin-left: -8px;
+	}
+}
+
+/* Printed lists are plain: black on white, with outlined boxes (browsers leave
+   backgrounds out by default), and none of the controls. */
+@media print {
+	:root {
+		--bg: #fff;
+		--surface: #fff;
+		--surface-done: #fff;
+		--text: #000;
+		--muted: #444;
+		--faint: #666;
+		--border: #bbb;
+		--border-strong: #666;
+		--accent: #000;
+		--accent-strong: #000;
+		--accent-soft: #fff;
+		--on-accent: #000;
+		--code-bg: #eee;
+		--drawer-bg: #fff;
+		--shadow: none;
+		--shadow-current: none;
+	}
+
+	.bar {
+		position: static;
+		background: none;
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
+	}
+
+	.actions,
+	.progress-track,
+	.handle,
+	.notice,
+	.toast,
+	.upcoming-hidden,
+	footer {
+		display: none !important;
+	}
+
+	.task {
+		break-inside: avoid;
+	}
+
+	.tasks input:checked + .box {
+		background: none;
+		border-color: #000;
 	}
 }
 

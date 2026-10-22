@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { LIMITS } from "../src/limits";
 import { PAGE_CSP, PAGE_HTML } from "../src/page.generated";
 import { get, post } from "./helpers";
 
@@ -52,6 +53,10 @@ describe("Content-Security-Policy", () => {
 		expect(directives.get("img-src")).toBe("data:");
 	});
 
+	it("refuses to turn strings into HTML or script", () => {
+		expect(directives.get("require-trusted-types-for")).toBe("'script'");
+	});
+
 	it("matches the <meta> policy, which can't carry frame-ancestors", () => {
 		const meta = PAGE_HTML.match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)">/)?.[1];
 		expect(`${meta}; frame-ancestors 'none'`).toBe(PAGE_CSP);
@@ -64,6 +69,11 @@ describe("Content-Security-Policy", () => {
 		expect(styles).toHaveLength(1);
 		expect(directives.get("script-src")).toBe(`'sha256-${await sha256(scripts[0])}'`);
 		expect(directives.get("style-src")).toBe(`'sha256-${await sha256(styles[0])}'`);
+	});
+
+	it("enforces the same limits as the Worker", () => {
+		expect(PAGE_HTML).toContain(`const LIMITS = ${JSON.stringify(LIMITS)};`);
+		expect(PAGE_HTML).not.toContain("{{LIMITS}}");
 	});
 
 	it("has no external resources or links in the page", () => {

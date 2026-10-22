@@ -8,13 +8,8 @@
 	const STORAGE_PREFIX = "listless:";
 	const FORMAT_PREFIX = "#v1.";
 	const ID_LENGTH = 12;
-	const MAX_TASKS = 500;
-	const MAX_SECTIONS = 50;
-	const MAX_TASK_LENGTH = 1000;
-	const MAX_DETAILS_LENGTH = 2000;
-	const MAX_COPY_LENGTH = 500;
-	const MAX_TITLE_LENGTH = 200;
-	const MAX_DESCRIPTION_LENGTH = 2000;
+	// Filled in at build time from src/limits.ts.
+	const LIMITS = "{{LIMITS}}";
 
 	const hoverable = matchMedia("(hover: hover)");
 
@@ -40,9 +35,15 @@
 		list: $("list"),
 		upcomingHidden: $("upcoming-hidden"),
 		allDone: $("all-done"),
+		index: $("index"),
+		indexList: $("index-list"),
 		message: $("message"),
 		messageTitle: $("message-title"),
 		messageBody: $("message-body"),
+		messageAction: $("message-action"),
+		toast: $("toast"),
+		toastText: $("toast-text"),
+		toastUndo: $("toast-undo"),
 	};
 
 	let id = null;
@@ -59,11 +60,11 @@
 	const clip = (text, max) => text.trim().slice(0, max);
 
 	function normalizeTask(task) {
-		if (typeof task === "string" && task.trim()) return { text: clip(task, MAX_TASK_LENGTH), details: "", copy: "", done: false };
+		if (typeof task === "string" && task.trim()) return { text: clip(task, LIMITS.maxTaskLength), details: "", copy: "", done: false };
 		if (task && typeof task === "object" && typeof task.text === "string" && task.text.trim()) {
-			const details = typeof task.details === "string" ? clip(task.details, MAX_DETAILS_LENGTH) : "";
-			const copy = typeof task.copy === "string" ? clip(task.copy, MAX_COPY_LENGTH) : "";
-			return { text: clip(task.text, MAX_TASK_LENGTH), details, copy, done: task.done === true };
+			const details = typeof task.details === "string" ? clip(task.details, LIMITS.maxDetailsLength) : "";
+			const copy = typeof task.copy === "string" ? clip(task.copy, LIMITS.maxCopyLength) : "";
+			return { text: clip(task.text, LIMITS.maxTaskLength), details, copy, done: task.done === true };
 		}
 		return null;
 	}
@@ -83,10 +84,10 @@
 
 		let sections;
 		if (Array.isArray(value.sections)) {
-			if (value.sections.length === 0 || value.sections.length > MAX_SECTIONS) return null;
+			if (value.sections.length === 0 || value.sections.length > LIMITS.maxSections) return null;
 			sections = value.sections.map((section) => {
 				const tasks = section && normalizeTasks(section.tasks);
-				const title = section && typeof section.title === "string" ? clip(section.title, MAX_TITLE_LENGTH) : "";
+				const title = section && typeof section.title === "string" ? clip(section.title, LIMITS.maxTitleLength) : "";
 				return tasks && { title, tasks };
 			});
 			if (sections.includes(null)) return null;
@@ -97,7 +98,7 @@
 		}
 
 		const total = sections.reduce((sum, section) => sum + section.tasks.length, 0);
-		if (total > MAX_TASKS) return null;
+		if (total > LIMITS.maxTasks) return null;
 
 		// Tasks marked done start out checked. That's progress, not content, so it
 		// is split off here and never becomes part of the list (or its id).
@@ -114,8 +115,8 @@
 		if (ordered) initialChecked = leadingRun(initialChecked);
 
 		return {
-			title: clip(value.title || "", MAX_TITLE_LENGTH),
-			description: clip(value.description || "", MAX_DESCRIPTION_LENGTH),
+			title: clip(value.title || "", LIMITS.maxTitleLength),
+			description: clip(value.description || "", LIMITS.maxDescriptionLength),
 			ordered,
 			sections,
 			initialChecked,
@@ -163,6 +164,23 @@
 		} catch {
 			// Nothing was saved, so there's nothing to remove.
 		}
+	}
+
+	// Every list saved in this browser, newest first.
+	function savedLists() {
+		const lists = [];
+		try {
+			for (let i = 0; i < localStorage.length; i++) {
+				const key = localStorage.key(i);
+				if (!key || !key.startsWith(STORAGE_PREFIX)) continue;
+				const listId = key.slice(STORAGE_PREFIX.length);
+				const list = load(listId);
+				if (list) lists.push({ id: listId, list });
+			}
+		} catch {
+			return [];
+		}
+		return lists.sort((a, b) => b.list.createdAt.localeCompare(a.list.createdAt));
 	}
 
 	function storageAvailable() {
@@ -352,7 +370,9 @@
 	}
 
 	function render() {
+		disarm(); // the controls it was waiting on are about to be replaced
 		els.message.hidden = true;
+		els.index.hidden = true;
 		els.bar.hidden = false;
 		els.list.hidden = false;
 		renderInline(els.title, displayTitle());
@@ -519,6 +539,7 @@
 	// label says which way. Without it, the button opens the options, so it's a menu
 	// button instead. It has no aria-pressed: that would give it the pressed circle.
 	function syncDisplayButton() {
+		if (!state) return; // no list is showing (an index or a message)
 		const button = els.display;
 		let label = "Display options";
 		if (hoverable.matches) {
@@ -540,17 +561,84 @@
 		button.title = text;
 	}
 
-	function showMessage(title, body) {
+	// An optional action adds a button below the text: { label, run }.
+	function showMessage(title, body, action) {
+		els.messageAction.hidden = !action;
+		els.messageAction.onclick = action ? action.run : null;
+		if (action) els.messageAction.textContent = action.label;
 		els.bar.hidden = true;
 		els.description.hidden = true;
 		els.list.hidden = true;
 		els.upcomingHidden.hidden = true;
 		els.allDone.hidden = true;
 		els.notice.hidden = true;
+		els.index.hidden = true;
 		els.message.hidden = false;
 		els.messageTitle.textContent = title;
 		els.messageBody.textContent = body;
 		document.title = "Listless";
+	}
+
+	// The index, or a message when it has run out of lists.
+	function redrawIndex() {
+		if (!showIndex()) showMessage("No lists saved", "Lists you open in this browser appear here. Open a list's link to get started.");
+	}
+
+	// The lists saved in this browser, for /l/ when there's no list to show.
+	function showIndex() {
+		const lists = savedLists();
+		if (lists.length === 0) return false;
+
+		const items = lists.map(({ id: listId, list }) => {
+			const li = el("li");
+			const entry = el("div", "entry");
+			const link = el("a");
+			const meta = el("span");
+			const del = el("button", "icon danger");
+			const total = list.sections.reduce((sum, section) => sum + section.tasks.length, 0);
+			const opened = new Date(list.createdAt);
+			link.href = "/l/" + listId;
+			renderInline(link, list.title || "Checklist");
+			meta.textContent = `${list.checked.length} of ${total} done` + (isNaN(opened) ? "" : ` · opened ${opened.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}`);
+			del.type = "button";
+			del.setAttribute("aria-label", `Delete list: ${(list.title || "Checklist").replace(/`/g, "")}`);
+			del.title = "Delete list";
+			del.append(els.del.querySelector("svg").cloneNode(true));
+			confirmable(del, "Click again to delete this list", () => {
+				const key = storageKey(listId);
+				let saved = null;
+				try {
+					saved = localStorage.getItem(key);
+					localStorage.removeItem(key);
+				} catch {
+					// Nothing was saved, so there's nothing to remove.
+				}
+				redrawIndex();
+				showToast("List deleted", () => {
+					try {
+						if (saved !== null) localStorage.setItem(key, saved);
+					} catch {
+						// The browser won't save it back.
+					}
+					redrawIndex();
+				});
+			});
+			entry.append(link, meta);
+			li.append(entry, del);
+			return li;
+		});
+
+		els.bar.hidden = true;
+		els.description.hidden = true;
+		els.list.hidden = true;
+		els.upcomingHidden.hidden = true;
+		els.allDone.hidden = true;
+		els.notice.hidden = true;
+		els.message.hidden = true;
+		els.indexList.replaceChildren(...items);
+		els.index.hidden = false;
+		document.title = "Your lists · Listless";
+		return true;
 	}
 
 	// An optional action adds a button after the text: { label, run }.
@@ -569,24 +657,146 @@
 		els.notice.hidden = false;
 	}
 
+	// ---- confirming and undoing --------------------------------------------------
+
+	// A destructive control waits for a second click: the first one arms it (red,
+	// with a check mark) and the second carries out the action. Anything else
+	// disarms it without doing anything. Only one control is armed at a time.
+	const ARM_MS = 4000;
+	let armed = null; // { target, timer, reset }
+
+	function disarm() {
+		if (!armed) return;
+		clearTimeout(armed.timer);
+		armed.reset();
+		armed = null;
+	}
+
+	function arm(target, prompt, reset) {
+		disarm();
+		els.announce.textContent = prompt;
+		armed = { target, timer: setTimeout(disarm, ARM_MS), reset };
+	}
+
+	// `run` happens on the second click; `canArm` skips arming when there's nothing to do.
+	function confirmable(button, prompt, run, canArm = () => true) {
+		button.addEventListener("click", () => {
+			if (armed?.target === button) {
+				disarm();
+				run();
+				return;
+			}
+			if (!canArm()) return disarm();
+			const label = button.getAttribute("aria-label");
+			const title = button.title;
+			button.classList.add("armed");
+			button.setAttribute("aria-label", prompt);
+			button.title = prompt;
+			arm(button, prompt, () => {
+				button.classList.remove("armed");
+				button.setAttribute("aria-label", label);
+				button.title = title;
+			});
+		});
+	}
+
+	document.addEventListener("click", (event) => {
+		if (armed && !armed.target.contains(event.target)) disarm();
+	});
+	// Tabbing away disarms too. (Focus going nowhere is a click on plain text,
+	// which the click handler above deals with; pressing a row's check box does
+	// this once before the click lands.)
+	document.addEventListener("focusout", (event) => {
+		if (armed && event.relatedTarget && !armed.target.contains(event.relatedTarget)) disarm();
+	});
+
+	// The last undoable change stays on offer until something else changes.
+	let undo = null;
+
+	function showToast(text, restore) {
+		els.toastText.textContent = text;
+		undo = restore;
+		els.toast.hidden = false;
+	}
+
+	function clearToast() {
+		undo = null;
+		els.toast.hidden = true;
+	}
+
+	function runUndo() {
+		const restore = undo;
+		clearToast();
+		if (restore) restore();
+	}
+
+	// Makes a change to the open list now and offers to take it back. The list can't
+	// have changed underneath the offer: it is dropped if the page moved to another list.
+	function undoable(text, change, restore) {
+		const listId = id;
+		clearToast();
+		change();
+		showToast(text, () => {
+			if (id === listId) restore();
+		});
+	}
+
+	els.toastUndo.addEventListener("click", runUndo);
+	document.addEventListener("keydown", (event) => {
+		if (event.key === "Escape") {
+			if (armed) disarm();
+			else clearToast();
+		} else if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "z" && undo) {
+			event.preventDefault();
+			runUndo();
+		}
+	});
+
 	// ---- actions ---------------------------------------------------------------
 
 	els.list.addEventListener("change", (event) => {
 		const box = event.target;
 		if (!(box instanceof HTMLInputElement)) return;
 		const index = Number(box.dataset.index);
+		const row = box.closest(".task");
+		if (armed && armed.target !== row) disarm();
 
 		if (box.checked) {
+			clearToast();
 			state.checked = [...new Set([...state.checked, index])].sort((a, b) => a - b);
 		} else if (state.ordered) {
-			// Unchecking a step reopens it and everything after it.
+			// Unchecking a step reopens it and everything after it, so it asks first:
+			// the step is armed, and unchecking it again goes ahead.
 			const later = state.checked.filter((i) => i > index).length;
-			if (later > 0 && !confirm(`Uncheck this step and the ${later === 1 ? "step" : `${later} steps`} after it?`)) {
-				box.checked = true;
+			if (later > 0) {
+				if (armed?.target !== row) {
+					const prompt = `Uncheck again to reopen this step and the ${later === 1 ? "step" : `${later} steps`} after it`;
+					box.checked = true;
+					row.classList.add("armed");
+					arm(row, prompt, () => row.classList.remove("armed"));
+					return;
+				}
+				disarm();
+				const before = state.checked;
+				undoable(
+					`Reopened this step and the ${later === 1 ? "step" : `${later} steps`} after it`,
+					() => {
+						state.checked = before.filter((i) => i < index);
+						save();
+						update();
+					},
+					() => {
+						state.checked = before;
+						save();
+						update();
+					},
+				);
 				return;
 			}
+			clearToast();
 			state.checked = state.checked.filter((i) => i < index);
 		} else {
+			clearToast();
 			state.checked = state.checked.filter((i) => i !== index);
 		}
 		save();
@@ -678,19 +888,46 @@
 		if (!els.displayMenu.contains(document.activeElement)) els.displayMenu.classList.remove("dismissed");
 	});
 
-	els.reset.addEventListener("click", () => {
-		if (state.checked.length === 0) return;
-		if (!confirm("Uncheck every task?")) return;
-		state.checked = [];
-		save();
-		update();
-	});
+	confirmable(
+		els.reset,
+		"Click again to uncheck all",
+		() => {
+			const before = state.checked;
+			undoable(
+				`Unchecked ${before.length === 1 ? "1 task" : `${before.length} tasks`}`,
+				() => {
+					state.checked = [];
+					save();
+					update();
+				},
+				() => {
+					state.checked = before;
+					save();
+					update();
+				},
+			);
+		},
+		() => state.checked.length > 0,
+	);
 
-	els.del.addEventListener("click", () => {
-		if (!confirm("Delete this list from this browser? This can't be undone, but the original link can import it again.")) return;
+	confirmable(els.del, "Click again to delete this list", () => {
+		const listId = id;
+		const snapshot = state;
+		const restore = () => {
+			if (id !== listId) return;
+			clearToast();
+			state = snapshot;
+			save();
+			render();
+		};
+		clearToast();
 		remove();
 		state = null;
-		showMessage("List deleted", "It has been removed from this browser. Opening the original link again will import a fresh copy.");
+		showMessage("List deleted", "It has been removed from this browser. Opening the original link again will import a fresh copy.", {
+			label: "Restore",
+			run: restore,
+		});
+		showToast("List deleted", restore);
 	});
 
 	els.copy.addEventListener("click", async () => {
@@ -740,6 +977,7 @@
 		const done = new Set(state.checked);
 		const items = section.tasks.map((task, k) => ({ task, done: done.has(offset + k) }));
 		items.splice(to, 0, ...items.splice(from, 1));
+		clearToast(); // an undo would put check marks back by position, which just changed
 		section.tasks = items.map((item) => item.task);
 		state.checked = state.checked
 			.filter((i) => i < offset || i >= offset + items.length)
@@ -896,7 +1134,15 @@
 
 	// Keep other open tabs of the same list in sync.
 	window.addEventListener("storage", (event) => {
+		if (!els.index.hidden) {
+			if (event.key === null || event.key.startsWith(STORAGE_PREFIX)) {
+				clearToast();
+				redrawIndex();
+			}
+			return;
+		}
 		if (!id || event.key !== storageKey(id)) return;
+		clearToast(); // another tab changed this list, so an undo here could clobber that
 		if (event.newValue === null) {
 			state = null;
 			showMessage("List deleted", "This list was deleted in another tab.");
@@ -951,6 +1197,12 @@
 	}
 
 	async function start() {
+		// A notice, an armed button or an undo belongs to the list that raised it;
+		// none of them may outlive that list.
+		els.notice.hidden = true;
+		els.notice.replaceChildren();
+		disarm();
+		clearToast();
 		persistent = storageAvailable();
 
 		if (location.hash.startsWith(FORMAT_PREFIX)) {
@@ -983,6 +1235,7 @@
 
 		const match = location.pathname.match(/^\/l\/([A-Za-z0-9_-]+)$/);
 		if (!match) {
+			if (location.pathname === "/l/" && persistent && showIndex()) return;
 			showMessage("No list here", "Listless lists are created from a link an agent gives you. Open that link to get started.");
 			return;
 		}

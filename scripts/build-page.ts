@@ -1,19 +1,30 @@
 // Inlines src/page/page.css and src/page/page.js into src/page/page.html,
 // computes the SHA-256 hashes the Content-Security-Policy needs to allow
-// exactly that script and style, and writes src/page.generated.ts.
+// exactly that script and style, and writes src/page.generated.ts. The limits
+// from src/limits.ts are copied into the script first, so the page and the
+// Worker enforce the same ones.
 //
 // The generated file is committed so the deployed page can be reviewed in the
 // repo; CI rebuilds it and fails if it differs.
 
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
+import { LIMITS } from "../src/limits.ts";
 
 const root = new URL("../", import.meta.url);
 const read = (path: string) => readFileSync(new URL(path, root), "utf8");
 
 const template = read("src/page/page.html");
 const style = read("src/page/page.css");
-const script = read("src/page/page.js");
+
+// The page enforces the same limits as the Worker. They go in before the script
+// is hashed, so the Content-Security-Policy covers the script as shipped.
+const limitsPlaceholder = '"{{LIMITS}}"';
+const scriptSource = read("src/page/page.js");
+if (scriptSource.split(limitsPlaceholder).length !== 2) {
+	throw new Error(`page.js must contain ${limitsPlaceholder} exactly once`);
+}
+const script = scriptSource.replace(limitsPlaceholder, () => JSON.stringify(LIMITS));
 
 const hash = (source: string) => `'sha256-${createHash("sha256").update(source, "utf8").digest("base64")}'`;
 
@@ -25,6 +36,8 @@ const directives = [
 	"connect-src 'none'",
 	"form-action 'none'",
 	"base-uri 'none'",
+	// The page never turns a string into HTML or script; this makes the browser refuse if it ever does.
+	"require-trusted-types-for 'script'",
 ];
 
 // frame-ancestors only works as a header; browsers ignore it (with a console

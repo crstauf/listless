@@ -2,7 +2,7 @@
 
 Turn a list of tasks into a checklist page that lives only in your browser.
 
-Give an agent a wall of text, let it pull out the tasks, and get back a link to a clean checklist: one checkbox per task. It works at any screen size and follows your system's light or dark setting.
+Give an agent a wall of text, let it pull out the tasks, and get back a link to a clean checklist: one checkbox per task. It works at any screen size, prints as a plain list, and follows your system's light or dark setting.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/preview-dark.png">
@@ -15,7 +15,7 @@ Give an agent a wall of text, let it pull out the tasks, and get back a link to 
 - Nothing is stored anywhere else: not on the Worker, not in KV, D1, R2 or Durable Objects, not in logs, not in a cache, and not with any third party.
 - There are no accounts and no syncing.
 - The page's Content-Security-Policy forbids it from making **any** network request, so your browser itself enforces that nothing leaves the page.
-- Deleting a list, or clearing this site's data, removes it for good. Opening the original link again imports a fresh copy.
+- Deleting a list removes it for good once you move on: Delete can be undone right away, until you change something else or leave the page. Clearing this site's data removes every list. Opening the original link again imports a fresh copy.
 
 ## How it works
 
@@ -29,9 +29,9 @@ Give an agent a wall of text, let it pull out the tasks, and get back a link to 
 
 2. You open the link. The page reads the list from the address, saves it in your browser, and swaps the address for a short one: `https://<host>/l/<id>`. The id is a hash of the list's contents, so opening the same original link again finds the same list and keeps your check marks and any reordering, because the id is fixed when you first open the list. Check marks never affect it, but a link whose tasks are in a different order (such as a share link from a list someone reordered) is a different list. If the link marks tasks done that your saved copy hasn't checked, the page tells you and offers to use the link's check marks; your saved copy is never changed without you asking.
 
-3. You check things off. Everything is saved in your browser as you go.
+3. You check things off. Everything is saved in your browser as you go. Opening `https://<host>/l/` lists every list saved in this browser, with its progress, so you can find one again or delete it.
 
-The page shows progress overall and per section. In unordered lists, tasks can be reordered within their section by dragging the handle beside them, or with the arrow keys when it's focused. Its toolbar has **Copy as Markdown** (to paste your progress back to an agent), **Copy share link** (a full link carrying the list as it is now, with its order and check marks; building it happens in your browser and sends nothing), **Hide completed**, **Hide upcoming** (ordered lists), a **Display** button (hover it, or tap it, for **Hide details** and **Hide copy text**), **Uncheck all**, and **Delete**. Only the checkbox toggles a task, so the text can be selected like any other text. Web addresses in it are links, and clicking a code span or a copy value selects all of it, ready to copy.
+The page shows progress overall and per section. In unordered lists, tasks can be reordered within their section by dragging the handle beside them, or with the arrow keys when it's focused. Its toolbar has **Copy as Markdown** (to paste your progress back to an agent), **Copy share link** (a full link carrying the list as it is now, with its order and check marks; building it happens in your browser and sends nothing), **Hide completed**, **Hide upcoming** (ordered lists), a **Display** button (hover it, or tap it, for **Hide details** and **Hide copy text**), **Uncheck all**, and **Delete**. Those last two, and unchecking an ordered step that has later steps checked, don't use pop-up dialogs: the first click turns the control red with a check mark, and a second click goes ahead (clicking anywhere else, pressing Escape, or waiting a few seconds cancels). Afterwards, an **Undo** button (or Ctrl/⌘+Z) brings the change back until you change something else; a deleted list can be restored the same way. Only the checkbox toggles a task, so the text can be selected like any other text. Web addresses in it are links, and clicking a code span or a copy value selects all of it, ready to copy.
 
 ## List format
 
@@ -90,6 +90,7 @@ Limits:
 | Opening a locally built link | One `GET /l/` for the page, which contains no task data. Nothing after that. |
 | Using `POST /api/lists` | One `POST` with the tasks; the response is the link. Nothing is stored or logged. |
 | Reopening `/l/<id>` | One `GET` for the page. The list stays in your browser. |
+| Opening `/l/` (your lists) | One `GET` for the page. The index is read from your browser's storage. |
 | Copy share link | None. The link is built in your browser and copied to the clipboard; opening it somewhere else is the same as opening any other link. |
 | Clicking a link in a list | The linked site opens in a new tab, with no referrer, so it doesn't learn which list you came from. Nothing happens until you click. |
 
@@ -97,9 +98,9 @@ Limits:
 
 You don't have to take this README's word for it:
 
-1. **View the page source.** The `<meta http-equiv="Content-Security-Policy">` tag includes `default-src 'none'` and `connect-src 'none'`. Together they block every fetch, XHR, WebSocket, beacon, form submission and external resource. The same policy is sent as a response header.
+1. **View the page source.** The `<meta http-equiv="Content-Security-Policy">` tag includes `default-src 'none'` and `connect-src 'none'`. Together they block every fetch, XHR, WebSocket, beacon, form submission and external resource. It also includes `require-trusted-types-for 'script'`, so the browser refuses to turn a string into HTML or script. The same policy is sent as a response header.
 2. **Watch the Network tab** in your browser's developer tools while you open a list and check things off. After the page loads, there are no requests, unless you click a link in the list, which opens in a new tab.
-3. **Read the code.** The whole page is [`src/page/`](src/page/), and the Worker is [`src/index.ts`](src/index.ts). The tests check that the policy forbids network access, that its hashes match the page's only inline script and style, and that the Worker has no storage bindings.
+3. **Read the code.** The whole page is [`src/page/`](src/page/), and the Worker is [`src/index.ts`](src/index.ts). The tests check that the policy forbids network access, that its hashes match the page's only inline script and style, and that the Worker has no storage bindings. The browser tests in [`test/page/`](test/page/) drive the page in Chromium and fail on any Content-Security-Policy violation, console error or pop-up dialog.
 4. **Check the deploy.** The hosted Worker is deployed only by [this repository's workflow](.github/workflows/deploy.yml) from `master`, and Workers logging is turned off in [`wrangler.jsonc`](wrangler.jsonc).
 
 Or run it yourself (see below).
@@ -113,7 +114,7 @@ npm ci
 npm run dev        # http://localhost:8787
 ```
 
-Under `wrangler dev`, everything stays on your machine.
+Under `wrangler dev`, everything stays on your machine. If port 8787 is already in use, Wrangler picks the next free one and prints it.
 
 To deploy to your own Cloudflare account:
 
@@ -126,19 +127,24 @@ Or run `npx wrangler login && npm run deploy`. No KV namespaces or other resourc
 ```sh
 npm run build      # rebuild src/page.generated.ts from src/page/
 npm run typecheck
-npm test
+npm test           # the Worker: headers, CSP, API
+npm run test:page  # the page, driven in Chromium (npx playwright install chromium, once)
 ```
 
-The page source lives in `src/page/` (`page.html`, `page.css`, `page.js`). `npm run build` inlines the CSS and JS into the HTML, computes the SHA-256 hashes the Content-Security-Policy needs, and writes `src/page.generated.ts`. That file is committed so the deployed page can be reviewed in the repository. CI rebuilds it and fails if it differs.
+The page source lives in `src/page/` (`page.html`, `page.css`, `page.js`). `npm run build` inlines the CSS and JS into the HTML, computes the SHA-256 hashes the Content-Security-Policy needs, and writes `src/page.generated.ts`. That file is committed so the deployed page can be reviewed in the repository. CI rebuilds it and fails if it differs. The build also copies the limits from [`src/limits.ts`](src/limits.ts), which the Worker uses too, into the page script before hashing it, so both enforce the same ones.
+
+The browser tests (`npm run test:page`) serve the built page to Chromium with the same Content-Security-Policy header the Worker sends, so they need no server.
 
 After changing how the page looks, run `npm run screenshots` to recapture the README preview (`docs/preview-light.png` and `docs/preview-dark.png`). It needs Playwright's Chromium, which you can install once with `npx playwright install chromium`. No server is needed.
 
 ### Deploying from GitHub Actions
 
-Two workflows live in `.github/workflows/`. `check.yml` runs the checks on every pull request and has no access to secrets. `deploy.yml` runs on pushes to `master`: it calls `check.yml` first, then deploys. The deploy needs two repository (or `production` environment) secrets:
+Two workflows live in `.github/workflows/`. `check.yml` runs the checks (the generated page is up to date, typecheck, the Worker tests and the browser tests) on every pull request and has no access to secrets. `deploy.yml` runs on pushes to `master`: it calls `check.yml` first, then deploys. The deploy needs two repository (or `production` environment) secrets:
 
 - `CLOUDFLARE_API_TOKEN`: an API token with the **Workers Scripts: Edit** permission
 - `CLOUDFLARE_ACCOUNT_ID`
+
+[Dependabot](.github/dependabot.yml) opens a weekly pull request for updates to the Actions and the npm dependencies; the same checks run on it.
 
 ## License
 

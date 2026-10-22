@@ -10,8 +10,9 @@
     "dev": "npm run build && wrangler dev",
     "deploy": "npm run build && wrangler deploy",
     "screenshots": "npm run build && node scripts/screenshots.ts",
-    "typecheck": "tsc -p . && tsc -p scripts",
-    "test": "vitest run"
+    "typecheck": "tsc -p . && tsc -p scripts && tsc -p test/page",
+    "test": "vitest run",
+    "test:page": "npm run build && vitest run -c vitest.page.config.ts"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "1.4.5",
