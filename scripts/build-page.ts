@@ -7,13 +7,22 @@
 
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
+import { LIMITS } from "../src/limits.ts";
 
 const root = new URL("../", import.meta.url);
 const read = (path: string) => readFileSync(new URL(path, root), "utf8");
 
 const template = read("src/page/page.html");
 const style = read("src/page/page.css");
-const script = read("src/page/page.js");
+
+// The page enforces the same limits as the Worker. They go in before the script
+// is hashed, so the Content-Security-Policy covers the script as shipped.
+const limitsPlaceholder = '"{{LIMITS}}"';
+const scriptSource = read("src/page/page.js");
+if (scriptSource.split(limitsPlaceholder).length !== 2) {
+	throw new Error(`page.js must contain ${limitsPlaceholder} exactly once`);
+}
+const script = scriptSource.replace(limitsPlaceholder, () => JSON.stringify(LIMITS));
 
 const hash = (source: string) => `'sha256-${createHash("sha256").update(source, "utf8").digest("base64")}'`;
 
@@ -25,6 +34,8 @@ const directives = [
 	"connect-src 'none'",
 	"form-action 'none'",
 	"base-uri 'none'",
+	// The page never turns a string into HTML or script; this makes the browser refuse if it ever does.
+	"require-trusted-types-for 'script'",
 ];
 
 // frame-ancestors only works as a header; browsers ignore it (with a console

@@ -2,16 +2,9 @@
 // The fragment is never sent to the server, so this module only runs for the
 // convenience POST endpoint; agents can produce the same string themselves.
 
-export const LIMITS = {
-	maxTasks: 500,
-	maxSections: 50,
-	maxTaskLength: 1_000,
-	maxDetailsLength: 2_000,
-	maxCopyLength: 500,
-	maxTitleLength: 200,
-	maxDescriptionLength: 2_000,
-	maxBodyBytes: 256 * 1024,
-} as const;
+import { LIMITS } from "./limits";
+
+export { LIMITS };
 
 export const FORMAT_PREFIX = "v1.";
 

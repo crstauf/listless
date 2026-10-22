@@ -45,10 +45,10 @@
 				</div>
 			</div>
 			<button type="button" id="reset" class="icon" aria-label="Uncheck all" title="Uncheck all">
-				<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4.5V9h4.5"/></svg>
+				<svg viewBox="0 0 24 24" aria-hidden="true"><g class="when-idle"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4.5V9h4.5"/></g><path class="when-armed" d="M5 12.5l4.5 4.5L19 7.5"/></svg>
 			</button>
 			<button type="button" id="delete" class="icon danger" aria-label="Delete list" title="Delete list">
-				<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M9 7V4.5h6V7"/><path d="M6 7l.9 12.1A1.5 1.5 0 0 0 8.4 20.5h7.2a1.5 1.5 0 0 0 1.5-1.4L18 7"/></svg>
+				<svg viewBox="0 0 24 24" aria-hidden="true"><g class="when-idle"><path d="M4 7h16M10 11v6M14 11v6M9 7V4.5h6V7"/><path d="M6 7l.9 12.1A1.5 1.5 0 0 0 8.4 20.5h7.2a1.5 1.5 0 0 0 1.5-1.4L18 7"/></g><path class="when-armed" d="M5 12.5l4.5 4.5L19 7.5"/></svg>
 			</button>
 		</div>
 	</div>
@@ -65,15 +65,25 @@
 		<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="22"/><path d="M14.5 24.5l6.5 6.5 13-14"/></svg>
 		<p><strong>All done.</strong> Every task is checked off.</p>
 	</div>
+	<section id="index" class="index" hidden>
+		<h1>Lists in this browser</h1>
+		<ul id="index-list"></ul>
+	</section>
 	<section id="message" class="message" hidden>
 		<h1 id="message-title"></h1>
 		<p id="message-body"></p>
+		<button type="button" id="message-action" hidden></button>
 	</section>
 </main>
 
 <footer>
-	<p>Stored only in this browser. Nothing on this page is sent anywhere. <a href="/">How Listless works</a></p>
+	<p>Stored only in this browser. Nothing on this page is sent anywhere. <a href="/l/">Your lists</a> · <a href="/">How Listless works</a></p>
 </footer>
+
+<div id="toast" class="toast" role="status" hidden>
+	<span id="toast-text"></span>
+	<button type="button" id="toast-undo">Undo</button>
+</div>
 
 <script>{{SCRIPT}}</script>
 </body>

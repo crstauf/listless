@@ -33,3 +33,8 @@ jobs:
       - run: npm run typecheck
 
       - run: npm test
+
+      - name: Test the page in a browser
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:page

@@ -29,9 +29,9 @@ Give an agent a wall of text, let it pull out the tasks, and get back a link to 
 
 2. You open the link. The page reads the list from the address, saves it in your browser, and swaps the address for a short one: `https://<host>/l/<id>`. The id is a hash of the list's contents, so opening the same original link again finds the same list and keeps your check marks and any reordering, because the id is fixed when you first open the list. Check marks never affect it, but a link whose tasks are in a different order (such as a share link from a list someone reordered) is a different list. If the link marks tasks done that your saved copy hasn't checked, the page tells you and offers to use the link's check marks; your saved copy is never changed without you asking.
 
-3. You check things off. Everything is saved in your browser as you go.
+3. You check things off. Everything is saved in your browser as you go. Opening `https://<host>/l/` lists every list saved in this browser, with its progress, so you can find one again or delete it.
 
-The page shows progress overall and per section. In unordered lists, tasks can be reordered within their section by dragging the handle beside them, or with the arrow keys when it's focused. Its toolbar has **Copy as Markdown** (to paste your progress back to an agent), **Copy share link** (a full link carrying the list as it is now, with its order and check marks; building it happens in your browser and sends nothing), **Hide completed**, **Hide upcoming** (ordered lists), a **Display** button (hover it, or tap it, for **Hide details** and **Hide copy text**), **Uncheck all**, and **Delete**. Only the checkbox toggles a task, so the text can be selected like any other text. Web addresses in it are links, and clicking a code span or a copy value selects all of it, ready to copy.
+The page shows progress overall and per section. In unordered lists, tasks can be reordered within their section by dragging the handle beside them, or with the arrow keys when it's focused. Its toolbar has **Copy as Markdown** (to paste your progress back to an agent), **Copy share link** (a full link carrying the list as it is now, with its order and check marks; building it happens in your browser and sends nothing), **Hide completed**, **Hide upcoming** (ordered lists), a **Display** button (hover it, or tap it, for **Hide details** and **Hide copy text**), **Uncheck all**, and **Delete**. Those last two, and unchecking an ordered step that has later steps checked, don't use pop-up dialogs: the first click turns the control red with a check mark, and a second click goes ahead (clicking anywhere else, pressing Escape, or waiting a few seconds cancels). Afterwards, an **Undo** button (or Ctrl/⌘+Z) brings the change back until you change something else; a deleted list can be restored the same way. Only the checkbox toggles a task, so the text can be selected like any other text. Web addresses in it are links, and clicking a code span or a copy value selects all of it, ready to copy.
 
 ## List format
 
@@ -126,7 +126,8 @@ Or run `npx wrangler login && npm run deploy`. No KV namespaces or other resourc
 ```sh
 npm run build      # rebuild src/page.generated.ts from src/page/
 npm run typecheck
-npm test
+npm test           # the Worker: headers, CSP, API
+npm run test:page  # the page, driven in Chromium (npx playwright install chromium, once)
 ```
 
 The page source lives in `src/page/` (`page.html`, `page.css`, `page.js`). `npm run build` inlines the CSS and JS into the HTML, computes the SHA-256 hashes the Content-Security-Policy needs, and writes `src/page.generated.ts`. That file is committed so the deployed page can be reviewed in the repository. CI rebuilds it and fails if it differs.
