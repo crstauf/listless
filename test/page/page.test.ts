@@ -610,6 +610,94 @@ describe("several copy values", () => {
 	});
 });
 
+describe("collapsing sections", () => {
+	const sectioned = {
+		sections: [
+			{ title: "Alpha", tasks: ["A1", "A2", "A3"] },
+			{ title: "Beta", tasks: ["B1", "B2"] },
+			{ title: "Gamma", tasks: ["G1"] },
+		],
+	};
+	const chevron = (page: Page, index: number) => page.locator("#list .collapse").nth(index);
+	const expanded = (page: Page) => page.locator("#list .collapse").evaluateAll((buttons) => buttons.map((b) => b.getAttribute("aria-expanded")));
+	const alt = (page: Page, index: number) => page.locator("#list .check").nth(index).click({ modifiers: ["Alt"] });
+
+	it("folds a section with its chevron, and remembers it across a reload", async () => {
+		const { open } = await session();
+		const page = await open(linkFor(sectioned));
+		await page.waitForURL(ID_URL);
+		expect(await expanded(page)).toEqual(["true", "true", "true"]);
+		await chevron(page, 1).click();
+		expect(await expanded(page)).toEqual(["true", "false", "true"]);
+		expect(await chevron(page, 1).getAttribute("aria-label")).toBe("Expand section");
+		await page.locator("#section-1-tasks").waitFor({ state: "hidden" });
+		await page.reload();
+		await page.locator("#list .collapse").first().waitFor();
+		expect(await expanded(page)).toEqual(["true", "false", "true"]);
+		await chevron(page, 1).click();
+		expect(await expanded(page)).toEqual(["true", "true", "true"]);
+	});
+
+	it("folds or opens every section with Alt", async () => {
+		const { open } = await session();
+		const page = await open(linkFor(sectioned));
+		await chevron(page, 0).click({ modifiers: ["Alt"] });
+		expect(await expanded(page)).toEqual(["false", "false", "false"]);
+		await chevron(page, 2).click({ modifiers: ["Alt"] });
+		expect(await expanded(page)).toEqual(["true", "true", "true"]);
+	});
+
+	it("has no chevrons for a list without sections", async () => {
+		const { open } = await session();
+		const page = await open(linkFor(groceries));
+		expect(await page.locator("#list .collapse").count()).toBe(0);
+		expect(await page.locator("#list [data-hint]").count()).toBe(0);
+	});
+
+	it("hints on the last open checkbox of a section only", async () => {
+		const { open } = await session();
+		const page = await open(linkFor(sectioned));
+		const hints = () => page.locator("#list .check").evaluateAll((labels) => labels.map((l) => (l as HTMLElement).dataset.hint ?? ""));
+		expect((await hints()).filter(Boolean)).toEqual([]);
+		await toggle(page, 0);
+		await toggle(page, 1);
+		expect((await hints()).map(Boolean)).toEqual([false, false, true, false, false, false]);
+		await toggle(page, 3);
+		expect((await hints()).map(Boolean)).toEqual([false, false, true, false, true, false]);
+	});
+
+	it("folds the section when Alt checks its last open task, but not for a plain click", async () => {
+		const { open } = await session();
+		const page = await open(linkFor(sectioned));
+		await toggle(page, 0);
+		await toggle(page, 1);
+		await page.locator("#list .check").nth(2).click();
+		await page.waitForTimeout(500);
+		expect(await expanded(page)).toEqual(["true", "true", "true"]);
+		await page.locator("#list .check").nth(2).click();
+		await alt(page, 2);
+		await page.waitForFunction(() => document.querySelector("#list .collapse")?.getAttribute("aria-expanded") === "false");
+		expect(await expanded(page)).toEqual(["false", "true", "true"]);
+		expect(await checks(page)).toEqual([true, true, true, false, false, false]);
+	});
+
+	it("keeps the folded state out of the share link and the list's id", async () => {
+		const { open, context } = await session();
+		await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+		const page = await open(linkFor(sectioned));
+		await page.waitForURL(ID_URL);
+		const id = page.url();
+		await page.locator("#share").click();
+		await page.locator("#share.flash").waitFor();
+		const before = await page.evaluate(() => navigator.clipboard.readText());
+		await chevron(page, 0).click();
+		await page.locator("#share").click();
+		await page.locator("#share.flash").waitFor();
+		expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(before);
+		expect(page.url()).toBe(id);
+	});
+});
+
 describe("the display options", () => {
 	const detailed = { tasks: [{ text: "A", details: "More about A", copy: "value-a" }, "B"] };
 	const hasClass = (page: Page, name: string) => page.locator("#list").evaluate((list, cls) => list.classList.contains(cls), name);
