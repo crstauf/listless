@@ -165,6 +165,82 @@ describe("ordered sections", () => {
 		await other.waitForURL(ID_URL);
 		expect(await other.locator("#list .step").count()).toBe(3);
 	});
+
+	it("keeps check marks when reloaded, and drops saved ones the ordering doesn't allow", async () => {
+		const { open } = await session();
+		const page = await open(linkFor(setup));
+		for (const i of [0, 1, 2]) await toggle(page, i);
+		await page.reload();
+		await page.locator("#list .task").first().waitFor();
+		expect(await checks(page)).toEqual([true, true, true, false, false]);
+
+		// Checks saved for Install while Gather is unfinished can't be honored.
+		await page.evaluate(() => {
+			for (const key of Object.keys(localStorage)) {
+				const list = JSON.parse(localStorage.getItem(key)!);
+				if (Array.isArray(list.checked)) localStorage.setItem(key, JSON.stringify({ ...list, checked: [1, 3, 4] }));
+			}
+		});
+		await page.reload();
+		await page.locator("#list .task").first().waitFor();
+		expect(await checks(page)).toEqual([false, true, false, false, false]);
+	});
+
+	it("offers a link's check marks only where the ordering allows them", async () => {
+		const { open } = await session();
+		const first = await open(linkFor(setup));
+		await first.waitForURL(ID_URL);
+
+		const done = (...marked: number[]) => ({
+			...setup,
+			sections: setup.sections.map((section, s) => ({
+				...section,
+				tasks: section.tasks.map((text, k) => (marked.includes(s * 2 + k) ? { text, done: true } : text)),
+			})),
+		});
+
+		// Install's first step can't start out done while Gather is unfinished.
+		const early = await open(linkFor(done(2)));
+		await early.waitForURL(ID_URL);
+		expect(await early.locator("#notice").isHidden()).toBe(true);
+
+		const allowed = await open(linkFor(done(0, 1, 2)));
+		await allowed.waitForURL(ID_URL);
+		expect(await allowed.locator("#notice").textContent()).toContain("check marks your saved copy doesn't");
+		await allowed.locator("#notice button").click();
+		expect(await checks(allowed)).toEqual([true, true, true, false, false]);
+	});
+
+	it("offers Hide upcoming when only a section is ordered, and hides just its locked steps", async () => {
+		const { open } = await session();
+		const plain = await open(linkFor(groceries));
+		expect(await plain.locator("#toggle-upcoming").isHidden()).toBe(true);
+
+		const page = await open(
+			linkFor({ sections: [{ title: "A", tasks: ["a", "b"] }, { title: "B", ordered: true, tasks: ["c", "d", "e"] }] }),
+		);
+		expect(await page.locator("#toggle-upcoming").isVisible()).toBe(true);
+		await page.locator("#toggle-upcoming").click();
+		expect(await page.locator("#list .task:not([hidden]) .text").allTextContents()).toEqual(["a", "b", "c"]);
+		expect(await page.locator("#upcoming-hidden").textContent()).toBe("2 upcoming tasks hidden · Show");
+	});
+
+	it("keeps a list without headings ordered when shared", async () => {
+		const first = await session();
+		for (const list of [{ ordered: true, tasks: ["a", "b", "c"] }, { sections: [{ ordered: true, tasks: ["a", "b", "c"] }] }]) {
+			const page = await first.open(linkFor(list));
+			await toggle(page, 0);
+			await page.locator("#share").click();
+			await page.locator("#share.flash").waitFor();
+			const shared = await page.evaluate(() => navigator.clipboard.readText());
+
+			const other = await (await session()).open(shared);
+			await other.waitForURL(ID_URL);
+			expect(await other.locator("#list .step").count()).toBe(3);
+			expect(await checks(other)).toEqual([true, false, false]);
+			expect(await Promise.all([1, 2].map((i) => input(other, i).isDisabled()))).toEqual([false, true]);
+		}
+	});
 });
 
 describe("reordering", () => {

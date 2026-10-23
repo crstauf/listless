@@ -203,6 +203,13 @@ describe("GET /", () => {
 		expect(text).toContain(`${ORIGIN}/l/#v1.`);
 		expect(text).toContain(`curl -s -X POST ${ORIGIN}/api/lists`);
 	});
+
+	it("explains ordering on both sections and tasks", async () => {
+		const text = await (await get("/")).text();
+		expect(text).toContain("the sections are done in order");
+		expect(text).toContain('A section can also be "ordered": true');
+		expect(text).toContain('{"title": "Install", "ordered": true,');
+	});
 });
 
 describe("unknown paths", () => {
