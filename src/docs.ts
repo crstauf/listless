@@ -98,15 +98,17 @@ Errors return 400 (or 413 for an oversized body) with {"error": "..."}.
   else: an email address, phone number, account or order number,
   confirmation code, street address, or a short phrase to type exactly. It
   is shown on its own, exactly as written (no backticks or links), and
-  one tap selects all of it, and a button copies it. Keep the value alone, with no
-  label or explanation; those go in "text" or "details". Use backticks for
+  one tap selects all of it, and a button copies it. Keep each value alone, with no
+  label or explanation inside it; those go in "text" or "details" (or, for
+  several values, a "label" below). Use backticks for
   commands, file names and paths inside text instead.
 
       {"text": "Email Dana the invoice", "copy": "dana@example.com"}
 
   When a step needs several values, make "copy" an array. Each gets its own
   copy button. Give an item a short "label" (a field name, like "Name") when
-  the values could be confused; otherwise use bare strings. A single value
+  the values could be confused; otherwise use bare strings. The label is
+  shown beside its value, in capitals, and is not copied. A single value
   is always just a string.
 
       {"text": "Add the DNS record", "copy": [{"label": "Name", "value": "_acme"}, {"label": "Value", "value": "abc123"}]}
