@@ -17,7 +17,7 @@ const out = new URL("../docs/", import.meta.url);
 // 800 CSS pixels at 2x: sharp on high-density screens, and the README shows it
 // at 800px wide, so it appears at the page's real size.
 const width = 800;
-const height = 620;
+const height = 660;
 
 const list = {
 	v: 1,
@@ -30,7 +30,14 @@ const list = {
 			title: "Release",
 			ordered: true,
 			tasks: [
-				{ text: "Publish to npm", details: "Run `npm publish`, then check the package page shows 2.4.0." },
+				{
+					text: "Publish to npm",
+					details: "Run `npm publish`, then check the package page shows this version.",
+					copy: [
+						{ label: "Package", value: "@example/app" },
+						{ label: "Version", value: "2.4.0" },
+					],
+				},
 				"Push the tag with `git push --follow-tags`",
 			],
 		},
@@ -49,6 +56,14 @@ try {
 		await page.waitForURL(/\/l\/[A-Za-z0-9_-]+$/);
 		// Finish "Prepare", which unlocks "Release" and its first step.
 		for (const index of [0, 1]) await page.locator(".task .box").nth(index).click();
+		// The grab handle and copy button only show on hover, and the pointer can only
+		// be in one place, so show one of each by hand (setting style through the DOM
+		// is allowed by the page's CSP).
+		await page.evaluate(`
+			for (const button of [document.querySelectorAll(".task")[1].querySelector(".handle"), document.querySelector(".copy button")]) {
+				button.style.opacity = "1";
+			}
+		`);
 		await page.waitForTimeout(600); // let the check mark finish drawing
 		const path = new URL(`preview-${scheme}.png`, out).pathname;
 		await page.screenshot({ path, clip: { x: 0, y: 0, width, height }, animations: "disabled" });
