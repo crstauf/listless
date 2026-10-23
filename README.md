@@ -6,7 +6,7 @@ Give an agent a wall of text, let it pull out the tasks, and get back a link to 
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/preview-dark.png">
-  <img src="docs/preview-light.png" width="800" alt="A Listless checklist titled “Release v2.4”, with a description linking to the release thread. The Prepare section is complete, with both tasks checked off. In the Release section, step 1, “Publish to npm”, is highlighted as up next and step 2 is locked until it’s done. A row of toolbar buttons sits at the top right.">
+  <img src="docs/preview-light.png" width="800" alt="A Listless checklist titled “Release v2.4”, with a description linking to the release thread. The Prepare section is complete, with both tasks checked off. In the Release section, step 1, “Publish to npm”, is highlighted as up next, with a drawer below it holding the package name and version to copy, and step 2 is locked until it’s done. A row of toolbar buttons sits at the top right.">
 </picture>
 
 ## No off-site storage: everything is local

@@ -17,7 +17,7 @@ const out = new URL("../docs/", import.meta.url);
 // 800 CSS pixels at 2x: sharp on high-density screens, and the README shows it
 // at 800px wide, so it appears at the page's real size.
 const width = 800;
-const height = 620;
+const height = 660;
 
 const list = {
 	v: 1,
@@ -30,7 +30,14 @@ const list = {
 			title: "Release",
 			ordered: true,
 			tasks: [
-				{ text: "Publish to npm", details: "Run `npm publish`, then check the package page shows 2.4.0." },
+				{
+					text: "Publish to npm",
+					details: "Run `npm publish`, then check the package page shows this version.",
+					copy: [
+						{ label: "Package", value: "@example/app" },
+						{ label: "Version", value: "2.4.0" },
+					],
+				},
 				"Push the tag with `git push --follow-tags`",
 			],
 		},
