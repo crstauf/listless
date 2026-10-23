@@ -191,11 +191,6 @@ button.icon:hover {
 	color: var(--text);
 }
 
-button.icon[aria-pressed="true"] {
-	background: var(--accent-soft);
-	color: var(--accent-strong);
-}
-
 button.icon.danger:hover {
 	background: var(--danger-soft);
 	border-color: transparent;
@@ -226,8 +221,12 @@ button.icon[aria-pressed="true"] .slash-gap {
 }
 
 button.icon .slash-gap {
-	stroke: var(--accent-soft);
+	stroke: var(--bg);
 	stroke-width: 5;
+}
+
+button.icon:hover .slash-gap {
+	stroke: var(--surface);
 }
 
 /* The display button ghosts whichever part it is hiding; so do the options. */
@@ -363,10 +362,6 @@ button.icon .slash-gap {
 .menu.single .pill button.icon {
 	width: 40px;
 	border-radius: 50%;
-}
-
-.menu.single .pill button.icon[aria-pressed="true"] {
-	color: var(--muted);
 }
 
 button.icon.flash .when-idle {
