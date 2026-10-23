@@ -540,7 +540,7 @@ main {
 	display: grid;
 	grid-template-columns: subgrid;
 	grid-column: 1 / -1;
-	align-items: center;
+	align-items: baseline;
 	padding: 0.5em 0.5em 0.5em 0.8em;
 	border: 1px solid var(--border);
 	border-top: 0;
@@ -624,6 +624,7 @@ main {
    padding instead of making the drawer taller. */
 .tasks .copy button.icon {
 	grid-column: 3;
+	align-self: center;
 	width: 28px;
 	height: 28px;
 	margin: -5px 0 -5px 8px;
@@ -862,14 +863,14 @@ h1 code {
 		transition: transform 250ms ease 300ms;
 	}
 
-	/* The copy button only shows while its task is hovered, focused or just
+	/* A row's copy button only shows while that row is hovered, focused or just
 	   used (so the "Copied" check stays visible). */
 	.tasks .copy button.icon {
 		opacity: 0;
 		transition: opacity 150ms;
 	}
 
-	.tasks .task:hover .copy button.icon,
+	.tasks .copy:hover button.icon,
 	.tasks .copy button.icon:focus-visible,
 	.tasks .copy button.icon.flash {
 		opacity: 1;
