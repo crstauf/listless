@@ -56,6 +56,23 @@ describe("POST /api/lists", () => {
 		});
 	});
 
+	it("keeps ordered on a section, and drops it when false", async () => {
+		const { res, data } = await createLink({
+			sections: [
+				{ title: "Gather", ordered: false, tasks: ["a"] },
+				{ title: "Install", ordered: true, tasks: ["b", "c"] },
+			],
+		});
+		expect(res.status).toBe(201);
+		expect(await decodeList(data.url!.split("#")[1])).toEqual({
+			v: 1,
+			sections: [
+				{ title: "Gather", tasks: ["a"] },
+				{ title: "Install", ordered: true, tasks: ["b", "c"] },
+			],
+		});
+	});
+
 	it("keeps a trimmed copy value and drops a blank one", async () => {
 		const { data } = await createLink({
 			tasks: [{ text: "Email Dana", copy: " dana@example.com " }, { text: "One", copy: "  " }, { text: "Two", copy: "a\nb", details: "d" }],
@@ -93,6 +110,24 @@ describe("POST /api/lists", () => {
 		expect(res.status).toBe(201);
 	});
 
+	it("accepts done tasks across sections that are only ordered one way", async () => {
+		const { res } = await createLink({
+			sections: [
+				{ title: "A", ordered: true, tasks: [{ text: "1", done: true }, "2"] },
+				{ title: "B", tasks: ["3", { text: "4", done: true }] },
+			],
+		});
+		expect(res.status).toBe(201);
+		const gated = await createLink({
+			ordered: true,
+			sections: [
+				{ title: "A", tasks: [{ text: "1", done: true }, "2"] },
+				{ title: "B", tasks: ["3"] },
+			],
+		});
+		expect(gated.res.status).toBe(201);
+	});
+
 	it.each([
 		["a non-boolean done", { tasks: [{ text: "a", done: "yes" }] }],
 		["a done task after an open one in an ordered list", { ordered: true, tasks: ["a", { text: "b", done: true }] }],
@@ -100,6 +135,11 @@ describe("POST /api/lists", () => {
 			"a done task after an open one across ordered sections",
 			{ ordered: true, sections: [{ title: "A", tasks: ["a"] }, { title: "B", tasks: [{ text: "b", done: true }] }] },
 		],
+		[
+			"a done task after an open one in an ordered section",
+			{ sections: [{ title: "A", ordered: true, tasks: ["a", { text: "b", done: true }] }] },
+		],
+		["a non-boolean section ordered", { sections: [{ title: "A", ordered: "yes", tasks: ["a"] }] }],
 	])("rejects %s", async (_, body) => {
 		expect((await createLink(body)).res.status).toBe(400);
 	});
@@ -162,6 +202,13 @@ describe("GET /", () => {
 		expect(text).toContain("No off-site storage: everything is local");
 		expect(text).toContain(`${ORIGIN}/l/#v1.`);
 		expect(text).toContain(`curl -s -X POST ${ORIGIN}/api/lists`);
+	});
+
+	it("explains ordering on both sections and tasks", async () => {
+		const text = await (await get("/")).text();
+		expect(text).toContain("the sections are done in order");
+		expect(text).toContain('A section can also be "ordered": true');
+		expect(text).toContain('{"title": "Install", "ordered": true,');
 	});
 });
 

@@ -16,6 +16,8 @@ export type Task = string | { text: string; details?: string; copy?: string; don
 
 export interface Section {
 	title: string;
+	// The tasks in this section are done in sequence.
+	ordered?: true;
 	tasks: Task[];
 }
 
@@ -69,7 +71,7 @@ function toList(input: unknown): List {
 	if (tasks !== undefined) {
 		const cleaned = taskList(tasks, "tasks");
 		countTasks(cleaned.length);
-		if (ordered) checkDoneFirst(cleaned);
+		if (ordered) checkDoneFirst(cleaned, "list");
 		return { ...head, tasks: cleaned };
 	}
 
@@ -83,23 +85,42 @@ function toList(input: unknown): List {
 		const path = `sections[${i}]`;
 		if (!isObject(section)) throw new InvalidList(`${path} must be an object with "title" and "tasks".`);
 		const sectionTitle = requiredText(section.title, `${path}.title`, LIMITS.maxTitleLength);
+		if (section.ordered !== undefined && typeof section.ordered !== "boolean") {
+			throw new InvalidList(`"${path}.ordered" must be true or false when present.`);
+		}
 		const sectionTasks = taskList(section.tasks, `${path}.tasks`);
 		countTasks(sectionTasks.length);
-		return { title: sectionTitle, tasks: sectionTasks };
+		return { title: sectionTitle, ...(section.ordered ? { ordered: true as const } : {}), tasks: sectionTasks };
 	});
-	if (ordered) checkDoneFirst(cleanedSections.flatMap((section) => section.tasks));
+	checkDoneSections(cleanedSections, ordered === true);
 	return { ...head, sections: cleanedSections };
 }
 
-// Ordered lists are completed from the top, so a task can only start out done
-// if every task before it does too.
-function checkDoneFirst(tasks: Task[]): void {
+// An ordered list is completed section by section, and an ordered section task
+// by task, so a task can only start out done if what comes before it does too.
+function checkDoneSections(sections: Section[], ordered: boolean): void {
+	let incomplete = false;
+	for (const section of sections) {
+		const flags = section.tasks.map(isDone);
+		if (ordered && incomplete && flags.includes(true)) {
+			throw new InvalidList('In an ordered list, a section can only have "done" tasks once every section before it is done.');
+		}
+		if (section.ordered) checkDoneFirst(section.tasks, "section");
+		if (flags.includes(false)) incomplete = true;
+	}
+}
+
+// Without sections, an ordered list is one sequence of tasks.
+function checkDoneFirst(tasks: Task[], kind: "list" | "section"): void {
 	let open = false;
 	for (const task of tasks) {
-		const done = typeof task !== "string" && task.done === true;
-		if (done && open) throw new InvalidList('In an ordered list, "done" tasks must come before all others.');
-		if (!done) open = true;
+		if (isDone(task) && open) throw new InvalidList(`In an ordered ${kind}, "done" tasks must come before all others.`);
+		if (!isDone(task)) open = true;
 	}
+}
+
+function isDone(task: Task): boolean {
+	return typeof task !== "string" && task.done === true;
 }
 
 function taskList(value: unknown, path: string): Task[] {

@@ -6,7 +6,7 @@ Give an agent a wall of text, let it pull out the tasks, and get back a link to 
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/preview-dark.png">
-  <img src="docs/preview-light.png" width="800" alt="A Listless checklist titled “Release v2.4”, with a description linking to the release thread. Step 1 is checked off, step 2, “Publish to npm”, is highlighted as up next, and step 3 is locked until it’s done. A row of toolbar buttons sits at the top right.">
+  <img src="docs/preview-light.png" width="800" alt="A Listless checklist titled “Release v2.4”, with a description linking to the release thread. The Prepare section is complete, with both tasks checked off. In the Release section, step 1, “Publish to npm”, is highlighted as up next and step 2 is locked until it’s done. A row of toolbar buttons sits at the top right.">
 </picture>
 
 ## No off-site storage: everything is local
@@ -31,7 +31,7 @@ Give an agent a wall of text, let it pull out the tasks, and get back a link to 
 
 3. You check things off. Everything is saved in your browser as you go. Opening `https://<host>/l/` lists every list saved in this browser, with its progress, so you can find one again or delete it.
 
-The page shows progress overall and per section. In unordered lists, tasks can be reordered within their section by dragging the handle beside them, or with the arrow keys when it's focused. Its toolbar has **Copy as Markdown** (to paste your progress back to an agent), **Copy share link** (a full link carrying the list as it is now, with its order and check marks; building it happens in your browser and sends nothing), **Hide completed**, **Hide upcoming** (ordered lists), a **Display** button (hover it, or tap it, for **Hide details** and **Hide copy text**), **Uncheck all**, and **Delete**. Those last two, and unchecking an ordered step that has later steps checked, don't use pop-up dialogs: the first click turns the control red with a check mark, and a second click goes ahead (clicking anywhere else, pressing Escape, or waiting a few seconds cancels). Afterwards, an **Undo** button (or Ctrl/⌘+Z) brings the change back until you change something else; a deleted list can be restored the same way. Only the checkbox toggles a task, so the text can be selected like any other text. Web addresses in it are links, and clicking a code span or a copy value selects all of it, ready to copy.
+The page shows progress overall and per section. Tasks in sections that aren't ordered can be reordered within their section by dragging the handle beside them, or with the arrow keys when it's focused. Its toolbar has **Copy as Markdown** (to paste your progress back to an agent), **Copy share link** (a full link carrying the list as it is now, with its order and check marks; building it happens in your browser and sends nothing), **Hide completed**, **Hide upcoming** (when anything is ordered), a **Display** button (hover it, or tap it, for **Hide details** and **Hide copy text**), **Uncheck all**, and **Delete**. Those last two, and unchecking an ordered step that has later steps checked, don't use pop-up dialogs: the first click turns the control red with a check mark, and a second click goes ahead (clicking anywhere else, pressing Escape, or waiting a few seconds cancels). Afterwards, an **Undo** button (or Ctrl/⌘+Z) brings the change back until you change something else; a deleted list can be restored the same way. Only the checkbox toggles a task, so the text can be selected like any other text. Web addresses in it are links, and clicking a code span or a copy value selects all of it, ready to copy.
 
 ## List format
 
@@ -42,18 +42,41 @@ The page shows progress overall and per section. In unordered lists, tasks can b
   "description": "From https://claude.ai/chat/…",
   "ordered": true,
   "sections": [
-    { "title": "Prepare", "tasks": ["Review the PR", { "text": "Bump the version", "details": "Edit `package.json`." }, { "text": "Email Dana the invoice", "copy": "dana@example.com" }] },
-    { "title": "Release", "tasks": ["Merge to `main`", "Run `npm publish`"] }
+    { "title": "Prepare", "ordered": true, "tasks": ["Review the PR", { "text": "Bump the version", "details": "Edit `package.json`." }, { "text": "Email Dana the invoice", "copy": "dana@example.com" }] },
+    { "title": "Release", "ordered": true, "tasks": ["Merge to `main`", "Run `npm publish`"] }
   ]
 }
 ```
 
 - **`title`**: optional.
 - **`description`**: optional. It's shown under the title, which makes it a good place for a link back to the conversation the list came from.
-- **`ordered`**: optional. When `true`, tasks are done in sequence: only the next unfinished task can be checked off, and the ones after it stay locked. Unchecking a step reopens it and every step after it.
-- **`tasks`**: an array of tasks. A task is a string, or `{ "text", "details", "copy", "done" }` when it needs extra explanation, a value to paste elsewhere, or is already complete. Details show in smaller, muted text, and the reader can hide them. `copy` is one value (an email address, an order number, a confirmation code) shown exactly as written in its own box, selected whole with one click, with a copy button beside it; it stays visible when details are hidden. Add `"done": true` to a task that is already complete and it starts out checked off (in an ordered list, done tasks must come before all others).
-- **`sections`**: use this instead of `tasks` to group tasks under headings.
+- **`ordered`**: optional. When `true`, things are done in sequence. In a list without sections, only the next unfinished task can be checked off, and the ones after it stay locked. With sections, each section stays locked until every section before it is done. Unchecking a step reopens it and everything after it.
+- **`tasks`**: an array of tasks. A task is a string, or `{ "text", "details", "copy", "done" }` when it needs extra explanation, a value to paste elsewhere, or is already complete. Details show in smaller, muted text, and the reader can hide them. `copy` is one value (an email address, an order number, a confirmation code) shown exactly as written in its own box, selected whole with one click, with a copy button beside it; it stays visible when details are hidden. Add `"done": true` to a task that is already complete and it starts out checked off (in an ordered list or section, done tasks must come first: see [Ordering](#ordering)).
+- **`sections`**: use this instead of `tasks` to group tasks under headings. A section can also set `"ordered": true` to have its own tasks done in sequence (see [Ordering](#ordering)).
 - **Text** is plain, with two exceptions: `` `backtick` `` spans show as code, and web addresses (`http://` or `https://`) in task text, details and the description become links. Only the checkbox toggles a task, so clicking text, code or a link never checks it off.
+
+### Ordering
+
+`ordered` works on two levels, and the two settings are independent:
+
+- The list's `ordered` controls the order of the **sections**: each stays locked until every section before it is done.
+- A section's `ordered` controls the order of **its tasks**: only the next unfinished one can be checked off.
+
+So a list can mix them. This one lets the gathering happen in any order, keeps `Install` locked until `Gather` is done, and then runs the install steps one by one:
+
+```json
+{
+  "v": 1,
+  "title": "Set up the project",
+  "ordered": true,
+  "sections": [
+    { "title": "Gather", "tasks": ["Find the API key", "Find the deploy token"] },
+    { "title": "Install", "ordered": true, "tasks": ["Clone the repo", "Run `npm install`", "Run `npm test`"] }
+  ]
+}
+```
+
+For a single sequence across the whole list, as in the first example, set `ordered` on every section too. A list without sections is one group, so its `ordered` means its tasks are done in sequence. Tasks that start out `done` must fit the ordering: first in an ordered list without sections or in an ordered section, and only in a section whose earlier sections are all done when the list is ordered.
 
 ## For agents
 

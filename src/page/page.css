@@ -459,6 +459,10 @@ main {
 	text-align: center;
 }
 
+.group.locked .group-head h2 {
+	opacity: 0.6;
+}
+
 .group.complete .group-count {
 	background: var(--accent-soft);
 	border-color: transparent;
