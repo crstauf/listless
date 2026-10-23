@@ -595,7 +595,10 @@ main {
 	flex: none;
 	max-width: 40%;
 	overflow-wrap: anywhere;
-	color: var(--muted);
+	color: var(--faint);
+	font-size: 0.6875rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
 	-webkit-user-select: none;
 	user-select: none;
 }
