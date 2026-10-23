@@ -6,6 +6,8 @@ export const LIMITS = {
 	maxTaskLength: 1_000,
 	maxDetailsLength: 2_000,
 	maxCopyLength: 500,
+	maxCopyValues: 10,
+	maxCopyLabelLength: 50,
 	maxTitleLength: 200,
 	maxDescriptionLength: 2_000,
 	maxBodyBytes: 256 * 1024,

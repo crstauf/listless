@@ -556,6 +556,20 @@ describe("copying as Markdown", () => {
 		);
 	});
 
+	it("lists several copy values, with their labels", async () => {
+		const { open } = await session();
+		const page = await open(
+			linkFor({
+				title: "DNS",
+				tasks: [{ text: "Add the record", copy: [{ label: "Name", value: "_acme" }, "abc123"] }],
+			}),
+		);
+		await page.locator("#copy").click();
+		await page.locator("#copy.flash").waitFor();
+		const markdown = await page.evaluate(() => navigator.clipboard.readText());
+		expect(markdown).toBe(["# DNS", "", "- [ ] Add the record", "  Name: `_acme`", "  `abc123`"].join("\n") + "\n");
+	});
+
 	it("numbers the steps of an ordered list", async () => {
 		const { open } = await session();
 		const page = await open(linkFor(steps));
@@ -564,6 +578,35 @@ describe("copying as Markdown", () => {
 		await page.locator("#copy.flash").waitFor();
 		const markdown = await page.evaluate(() => navigator.clipboard.readText());
 		expect(markdown).toBe(["# Steps", "", "1. [x] One", "2. [ ] Two", "3. [ ] Three"].join("\n") + "\n");
+	});
+});
+
+describe("several copy values", () => {
+	const list = { tasks: [{ text: "Add the record", copy: [{ label: "Name", value: "_acme" }, "abc123"] }] };
+
+	it("gives each value its own row and button, and copies that value", async () => {
+		const { open } = await session();
+		const page = await open(linkFor(list));
+		expect(await page.locator(".copy").count()).toBe(2);
+		expect(await page.locator(".copy-label").allTextContents()).toEqual(["Name"]);
+		expect(await page.locator(".copy-value").allTextContents()).toEqual(["_acme", "abc123"]);
+		await page.locator(".copy").nth(1).hover();
+		const button = page.locator(".copy button").nth(1);
+		expect(await button.getAttribute("aria-label")).toBe("Copy value");
+		expect(await page.locator(".copy button").first().getAttribute("aria-label")).toBe("Copy Name");
+		await button.click();
+		await button.evaluate((el) => el.classList.contains("flash") || new Promise((r) => setTimeout(r, 50)));
+		expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("abc123");
+	});
+
+	it("keeps the saved list when a single value is written as an array", async () => {
+		const { open } = await session();
+		const first = await open(linkFor({ tasks: [{ text: "A", copy: "x" }] }));
+		await first.waitForURL(ID_URL);
+		const id = first.url();
+		const second = await open(linkFor({ tasks: [{ text: "A", copy: ["x"] }] }));
+		await second.waitForURL(ID_URL);
+		expect(second.url()).toBe(id);
 	});
 });
 

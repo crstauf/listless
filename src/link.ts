@@ -9,10 +9,12 @@ export { LIMITS };
 export const FORMAT_PREFIX = "v1.";
 
 // A task is plain text, or text plus muted details. Backtick spans in any text
-// are shown as code on the page; nothing else is interpreted. `copy` is one
-// value the user will paste elsewhere, shown literally with a copy button.
-// `done` marks a task that starts out checked off.
-export type Task = string | { text: string; details?: string; copy?: string; done?: true };
+// are shown as code on the page; nothing else is interpreted. `copy` is one or
+// more values the user will paste elsewhere, shown literally with a copy button
+// each. A value may carry a short label. A single unlabeled value is always a
+// plain string. `done` marks a task that starts out checked off.
+export type CopyValue = string | { label: string; value: string };
+export type Task = string | { text: string; details?: string; copy?: string | CopyValue[]; done?: true };
 
 export interface Section {
 	title: string;
@@ -141,7 +143,7 @@ function cleanTask(task: unknown, path: string): Task {
 	if (task.done !== undefined && typeof task.done !== "boolean") {
 		throw new InvalidList(`"${path}.done" must be true or false when present.`);
 	}
-	const copy = optionalText(task.copy, `${path}.copy`, LIMITS.maxCopyLength);
+	const copy = copyValues(task.copy, `${path}.copy`);
 	if (!details && !copy && !task.done) return text;
 	return {
 		text,
@@ -162,6 +164,33 @@ function optionalText(value: unknown, path: string, max: number): string | undef
 	if (value === undefined) return undefined;
 	if (typeof value !== "string") throw new InvalidList(`"${path}" must be a string when present.`);
 	return checkLength(value.trim(), path, max) || undefined;
+}
+
+// A string, or an array of strings and { label, value } objects. Blank values
+// are dropped, blank labels are ignored, and one unlabeled value collapses to a
+// string so lists that never used several values keep their form (and ID).
+function copyValues(value: unknown, path: string): string | CopyValue[] | undefined {
+	if (typeof value === "string" || value === undefined) return optionalText(value, path, LIMITS.maxCopyLength);
+	if (!Array.isArray(value)) throw new InvalidList(`"${path}" must be a string or an array when present.`);
+	if (value.length > LIMITS.maxCopyValues) {
+		throw new InvalidList(`"${path}" may contain at most ${LIMITS.maxCopyValues} values.`);
+	}
+	const items: CopyValue[] = [];
+	value.forEach((item, i) => {
+		const at = `${path}[${i}]`;
+		if (typeof item === "string") {
+			const text = optionalText(item, at, LIMITS.maxCopyLength);
+			if (text) items.push(text);
+		} else if (isObject(item)) {
+			const text = optionalText(item.value, `${at}.value`, LIMITS.maxCopyLength);
+			const label = optionalText(item.label, `${at}.label`, LIMITS.maxCopyLabelLength);
+			if (text) items.push(label ? { label, value: text } : text);
+		} else {
+			throw new InvalidList(`${at} must be a string or an object with "value".`);
+		}
+	});
+	if (items.length === 0) return undefined;
+	return items.length === 1 && typeof items[0] === "string" ? items[0] : items;
 }
 
 function checkLength(value: string, path: string, max: number): string {

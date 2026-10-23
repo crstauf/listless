@@ -540,18 +540,23 @@ main {
 	display: flex;
 	align-items: center;
 	gap: 8px;
-	min-height: 0;
-	align-self: start;
 	margin: 0 16px 0 54px;
 	padding: 0.5em 0.5em 0.5em 0.8em;
 	border: 1px solid var(--border);
 	border-top: 0;
-	border-radius: 0 0 10px 10px;
+	border-radius: 0;
 	background: var(--drawer-bg);
 	color: color-mix(in srgb, var(--muted) 60%, var(--faint));
 	font-size: 0.8125rem;
 	line-height: 1.4;
-	transition: transform 250ms ease, opacity 200ms;
+	transition: opacity 200ms;
+}
+
+/* Wraps the rows so the whole stack slides and collapses as one. */
+.tasks .copies {
+	min-height: 0;
+	align-self: start;
+	transition: transform 250ms ease;
 }
 
 .tasks .done .drawer {
@@ -560,7 +565,7 @@ main {
 	transition: grid-template-rows 250ms ease, visibility 0s 250ms;
 }
 
-.tasks .done .copy {
+.tasks .done .copies {
 	transform: translateY(-100%);
 }
 
@@ -572,8 +577,27 @@ main {
 	transition: grid-template-rows 250ms ease, visibility 0s 250ms;
 }
 
-.hide-copy .tasks .copy {
+.hide-copy .tasks .copies {
 	transform: translateY(-100%);
+}
+
+/* Several values stack in one drawer, split by hairlines; only the last row
+   rounds the bottom corners. */
+.tasks .copy:last-child {
+	border-radius: 0 0 10px 10px;
+}
+
+.tasks .copy + .copy {
+	border-top: 1px solid var(--border);
+}
+
+.tasks .copy-label {
+	flex: none;
+	max-width: 40%;
+	overflow-wrap: anywhere;
+	color: var(--muted);
+	-webkit-user-select: none;
+	user-select: none;
 }
 
 .tasks .copy-value {
@@ -822,9 +846,9 @@ h1 code {
 		transition: grid-template-rows 250ms ease 300ms, visibility 0s 300ms;
 	}
 
-	.hide-copy .tasks .task:not(.done, .shifting):hover .copy {
+	.hide-copy .tasks .task:not(.done, .shifting):hover .copies {
 		transform: none;
-		transition: transform 250ms ease 300ms, opacity 200ms;
+		transition: transform 250ms ease 300ms;
 	}
 
 	/* The copy button only shows while its task is hovered, focused or just
@@ -858,7 +882,7 @@ h1 code {
 
 /* Grabbing a handle ends any peek at once, so the rows hold still while dragged. */
 .tasks .shifting .drawer,
-.tasks .shifting .copy {
+.tasks .shifting .copies {
 	transition: none;
 }
 
