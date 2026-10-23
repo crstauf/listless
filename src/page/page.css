@@ -537,21 +537,29 @@ main {
 }
 
 .tasks .copy {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	min-height: 0;
-	align-self: start;
-	margin: 0 16px 0 54px;
+	display: grid;
+	grid-template-columns: subgrid;
+	grid-column: 1 / -1;
+	align-items: baseline;
 	padding: 0.5em 0.5em 0.5em 0.8em;
 	border: 1px solid var(--border);
 	border-top: 0;
-	border-radius: 0 0 10px 10px;
+	border-radius: 0;
 	background: var(--drawer-bg);
 	color: color-mix(in srgb, var(--muted) 60%, var(--faint));
 	font-size: 0.8125rem;
 	line-height: 1.4;
-	transition: transform 250ms ease, opacity 200ms;
+	transition: opacity 200ms;
+}
+
+/* Wraps the rows so the whole stack slides and collapses as one. */
+.tasks .copies {
+	display: grid;
+	grid-template-columns: fit-content(40%) minmax(0, 1fr) auto;
+	margin: 0 16px 0 54px;
+	min-height: 0;
+	align-self: start;
+	transition: transform 250ms ease;
 }
 
 .tasks .done .drawer {
@@ -560,7 +568,7 @@ main {
 	transition: grid-template-rows 250ms ease, visibility 0s 250ms;
 }
 
-.tasks .done .copy {
+.tasks .done .copies {
 	transform: translateY(-100%);
 }
 
@@ -572,12 +580,39 @@ main {
 	transition: grid-template-rows 250ms ease, visibility 0s 250ms;
 }
 
-.hide-copy .tasks .copy {
+.hide-copy .tasks .copies {
 	transform: translateY(-100%);
 }
 
+/* Several values stack in one drawer, split by hairlines; only the last row
+   rounds the bottom corners. */
+.tasks .copy:last-child {
+	border-radius: 0 0 10px 10px;
+}
+
+.tasks .copy + .copy {
+	border-top: 0.5px solid color-mix(in srgb, var(--border) 50%, transparent);
+}
+
+.tasks .copy-label {
+	grid-column: 1;
+	padding-right: 0.8em;
+	overflow-wrap: anywhere;
+	color: color-mix(in srgb, var(--faint) 75%, var(--drawer-bg));
+	font-size: 0.6875rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+/* Without a label the value takes the label's column too. */
+.tasks .copy-value:first-child {
+	grid-column: 1 / span 2;
+}
+
 .tasks .copy-value {
-	flex: 1;
+	grid-column: 2;
 	min-width: 0;
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
@@ -588,10 +623,11 @@ main {
 /* The button's box is taller than a line of text, so it overlaps the drawer's
    padding instead of making the drawer taller. */
 .tasks .copy button.icon {
-	flex: none;
+	grid-column: 3;
+	align-self: center;
 	width: 28px;
 	height: 28px;
-	margin: -5px 0;
+	margin: -5px 0 -5px 8px;
 }
 
 .tasks .copy button.icon svg {
@@ -822,19 +858,19 @@ h1 code {
 		transition: grid-template-rows 250ms ease 300ms, visibility 0s 300ms;
 	}
 
-	.hide-copy .tasks .task:not(.done, .shifting):hover .copy {
+	.hide-copy .tasks .task:not(.done, .shifting):hover .copies {
 		transform: none;
-		transition: transform 250ms ease 300ms, opacity 200ms;
+		transition: transform 250ms ease 300ms;
 	}
 
-	/* The copy button only shows while its task is hovered, focused or just
+	/* A row's copy button only shows while that row is hovered, focused or just
 	   used (so the "Copied" check stays visible). */
 	.tasks .copy button.icon {
 		opacity: 0;
 		transition: opacity 150ms;
 	}
 
-	.tasks .task:hover .copy button.icon,
+	.tasks .copy:hover button.icon,
 	.tasks .copy button.icon:focus-visible,
 	.tasks .copy button.icon.flash {
 		opacity: 1;
@@ -858,7 +894,7 @@ h1 code {
 
 /* Grabbing a handle ends any peek at once, so the rows hold still while dragged. */
 .tasks .shifting .drawer,
-.tasks .shifting .copy {
+.tasks .shifting .copies {
 	transition: none;
 }
 

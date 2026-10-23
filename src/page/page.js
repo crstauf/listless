@@ -59,11 +59,35 @@
 
 	const clip = (text, max) => text.trim().slice(0, max);
 
+	// A copy value is a string or an array of strings and { label, value } objects.
+	// Mirrors the Worker's rules, but clips instead of rejecting. One unlabeled
+	// value stays a string, so a list's ID doesn't depend on which form it used.
+	function normalizeCopy(copy) {
+		if (typeof copy === "string") return clip(copy, LIMITS.maxCopyLength);
+		if (!Array.isArray(copy)) return "";
+		const items = [];
+		for (const item of copy.slice(0, LIMITS.maxCopyValues)) {
+			const value = typeof item === "string" ? item : item && typeof item === "object" && typeof item.value === "string" ? item.value : "";
+			const text = clip(value, LIMITS.maxCopyLength);
+			if (!text) continue;
+			const label = item && typeof item.label === "string" ? clip(item.label, LIMITS.maxCopyLabelLength) : "";
+			items.push(label ? { label, value: text } : text);
+		}
+		if (items.length === 0) return "";
+		return items.length === 1 && typeof items[0] === "string" ? items[0] : items;
+	}
+
+	// The copy values of a task as [{ label, value }] ("" when unlabeled).
+	function copyItems(copy) {
+		if (!copy) return [];
+		return (Array.isArray(copy) ? copy : [copy]).map((item) => (typeof item === "string" ? { label: "", value: item } : item));
+	}
+
 	function normalizeTask(task) {
 		if (typeof task === "string" && task.trim()) return { text: clip(task, LIMITS.maxTaskLength), details: "", copy: "", done: false };
 		if (task && typeof task === "object" && typeof task.text === "string" && task.text.trim()) {
 			const details = typeof task.details === "string" ? clip(task.details, LIMITS.maxDetailsLength) : "";
-			const copy = typeof task.copy === "string" ? clip(task.copy, LIMITS.maxCopyLength) : "";
+			const copy = normalizeCopy(task.copy);
 			return { text: clip(task.text, LIMITS.maxTaskLength), details, copy, done: task.done === true };
 		}
 		return null;
@@ -474,22 +498,33 @@
 				}
 				// A value to paste elsewhere hangs below the card as a drawer.
 				let drawer = null;
-				if (task.copy) {
-					const value = el("span", "copy-value");
-					const button = el("button", "icon");
-					const copy = el("div", "copy");
+				const copies = copyItems(task.copy);
+				if (copies.length) {
 					drawer = el("div", "drawer");
-					value.id = `task-${index}-copy`;
-					value.textContent = task.copy;
-					button.type = "button";
-					button.setAttribute("aria-label", "Copy value");
-					button.title = "Copy value";
-					button.append(copyIcon());
-					button.addEventListener("click", async () => {
-						flash(button, (await copyText(task.copy)) ? "Copied" : "Copy failed");
+					const stack = el("div", "copies");
+					drawer.append(stack);
+					copies.forEach(({ label: name, value: text }, k) => {
+						const copy = el("div", "copy");
+						const value = el("span", "copy-value");
+						const button = el("button", "icon");
+						value.id = `task-${index}-copy-${k}`;
+						value.textContent = text;
+						const what = name ? `Copy ${name}` : "Copy value";
+						button.type = "button";
+						button.setAttribute("aria-label", what);
+						button.title = what;
+						button.append(copyIcon());
+						button.addEventListener("click", async () => {
+							flash(button, (await copyText(text)) ? "Copied" : "Copy failed");
+						});
+						if (name) {
+							const tag = el("span", "copy-label");
+							tag.textContent = name;
+							copy.append(tag);
+						}
+						copy.append(value, button);
+						stack.append(copy);
 					});
-					copy.append(value, button);
-					drawer.append(copy);
 				}
 				label.append(box, checkmark());
 				card.append(label, body);
@@ -504,7 +539,7 @@
 					sequential,
 					sectionIndex,
 					detailsId: task.details ? `task-${index}-details` : "",
-					copyId: task.copy ? `task-${index}-copy` : "",
+					copyId: copies.map((_, k) => `task-${index}-copy-${k}`).join(" "),
 				};
 				rows.push(row);
 				groupRows.push(row);
@@ -1132,14 +1167,16 @@
 				if (task.details) {
 					for (const line of task.details.split("\n")) lines.push(indent + line.trim());
 				}
-				if (task.copy) {
+				for (const { label: name, value } of copyItems(task.copy)) {
 					// A fence or span longer than any backtick run in the value can't be closed early by it.
-					const ticks = (min) => "`".repeat(Math.max(min, ...(task.copy.match(/`+/g) || []).map((run) => run.length + 1)));
-					if (/[`\n]/.test(task.copy)) {
+					const ticks = (min) => "`".repeat(Math.max(min, ...(value.match(/`+/g) || []).map((run) => run.length + 1)));
+					const prefix = name ? `${oneLine(name)}: ` : "";
+					if (/[`\n]/.test(value)) {
 						const fence = ticks(3);
-						lines.push(indent + fence, ...task.copy.split("\n").map((line) => indent + line), indent + fence);
+						if (prefix) lines.push(indent + prefix.trim());
+						lines.push(indent + fence, ...value.split("\n").map((line) => indent + line), indent + fence);
 					} else {
-						lines.push(indent + "`" + task.copy + "`");
+						lines.push(indent + prefix + "`" + value + "`");
 					}
 				}
 				index++;
@@ -1216,7 +1253,7 @@
 	// Tasks are matched by section and content, since the saved copy may have
 	// been reordered.
 	function offerLinkChecks(list) {
-		const key = (task) => task.text + "\0" + task.details + "\0" + (task.copy || "");
+		const key = (task) => task.text + "\0" + task.details + "\0" + JSON.stringify(task.copy || "");
 		const pending = state.sections.map((section) => {
 			const queues = new Map();
 			return { section, queues, add: (k, i) => queues.set(k, [...(queues.get(k) || []), i]) };

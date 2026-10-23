@@ -94,15 +94,25 @@ Errors return 400 (or 413 for an oversized body) with {"error": "..."}.
 
   Keep "text" short and actionable; put explanation, context or caveats in
   "details". The user can hide all details with one tap.
-  Add "copy" when the task hinges on one value the user will paste somewhere
+  Add "copy" when the task hinges on a value the user will paste somewhere
   else: an email address, phone number, account or order number,
   confirmation code, street address, or a short phrase to type exactly. It
   is shown on its own, exactly as written (no backticks or links), and
-  one tap selects all of it, and a button copies it. Keep the value alone, with no
-  label or explanation; those go in "text" or "details". Use backticks for
+  one tap selects all of it, and a button copies it. Keep each value alone, with no
+  label or explanation inside it; those go in "text" or "details" (or, for
+  several values, a "label" below). Use backticks for
   commands, file names and paths inside text instead.
 
       {"text": "Email Dana the invoice", "copy": "dana@example.com"}
+
+  When a step needs several values, make "copy" an array. Each gets its own
+  copy button. Give an item a short "label" (a field name, like "Name") when
+  the values could be confused; otherwise use bare strings. The label is
+  shown beside its value, in capitals, and is not copied. A single value
+  is always just a string.
+
+      {"text": "Add the DNS record", "copy": [{"label": "Name", "value": "_acme"}, {"label": "Value", "value": "abc123"}]}
+      {"text": "Fill in the shipping form", "copy": ["12 Main St", "555-0100"]}
 
   Add "done": true to an object task that is already complete; it starts out
   checked off. Done tasks must come first in an ordered list without sections
@@ -157,7 +167,7 @@ click.
 
 - tasks: 1 to ${LIMITS.maxTasks} in total; task text at most ${LIMITS.maxTaskLength} characters
 - details: at most ${LIMITS.maxDetailsLength} characters
-- copy: at most ${LIMITS.maxCopyLength} characters
+- copy: at most ${LIMITS.maxCopyLength} characters per value, ${LIMITS.maxCopyValues} values per task, labels at most ${LIMITS.maxCopyLabelLength} characters
 - sections: 1 to ${LIMITS.maxSections}, each with a title and at least one task
 - titles (list and section): at most ${LIMITS.maxTitleLength} characters
 - description: at most ${LIMITS.maxDescriptionLength} characters

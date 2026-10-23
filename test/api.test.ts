@@ -83,6 +83,28 @@ describe("POST /api/lists", () => {
 		});
 	});
 
+	it("keeps several copy values, labeled or not, and collapses a lone plain one", async () => {
+		const { data } = await createLink({
+			tasks: [
+				{ text: "A", copy: [" 12 Main St ", { label: " Phone ", value: " 555 " }, "  ", { label: "x", value: "" }] },
+				{ text: "B", copy: ["only"] },
+				{ text: "C", copy: [{ label: "  ", value: "v" }] },
+				{ text: "D", copy: [{ label: "Name", value: "n" }] },
+				{ text: "E", copy: [] },
+			],
+		});
+		expect(await decodeList(data.url!.split("#")[1])).toEqual({
+			v: 1,
+			tasks: [
+				{ text: "A", copy: ["12 Main St", { label: "Phone", value: "555" }] },
+				{ text: "B", copy: "only" },
+				{ text: "C", copy: "v" },
+				{ text: "D", copy: [{ label: "Name", value: "n" }] },
+				"E",
+			],
+		});
+	});
+
 	it("omits ordered when false and blank details", async () => {
 		const { data } = await createLink({ ordered: false, tasks: [{ text: "One", details: "  " }] });
 		expect(await decodeList(data.url!.split("#")[1])).toEqual({ v: 1, tasks: ["One"] });
@@ -173,6 +195,10 @@ describe("POST /api/lists", () => {
 		["a task object without text", JSON.stringify({ tasks: [{ details: "d" }] })],
 		["details that are too long", JSON.stringify({ tasks: [{ text: "ok", details: "d".repeat(LIMITS.maxDetailsLength + 1) }] })],
 		["a copy value that is not a string", JSON.stringify({ tasks: [{ text: "ok", copy: 5 }] })],
+		["a copy item of the wrong type", JSON.stringify({ tasks: [{ text: "ok", copy: ["a", 5] }] })],
+		["too many copy values", JSON.stringify({ tasks: [{ text: "ok", copy: Array(LIMITS.maxCopyValues + 1).fill("c") }] })],
+		["a copy label that is too long", JSON.stringify({ tasks: [{ text: "ok", copy: [{ label: "l".repeat(LIMITS.maxCopyLabelLength + 1), value: "c" }] }] })],
+		["a copy item value that is too long", JSON.stringify({ tasks: [{ text: "ok", copy: [{ value: "c".repeat(LIMITS.maxCopyLength + 1) }] }] })],
 		["a copy value that is too long", JSON.stringify({ tasks: [{ text: "ok", copy: "c".repeat(LIMITS.maxCopyLength + 1) }] })],
 		["a non-boolean ordered", JSON.stringify({ ordered: "yes", tasks: ["ok"] })],
 	])("rejects %s with 400", async (_, body) => {
