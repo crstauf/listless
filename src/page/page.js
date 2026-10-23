@@ -48,11 +48,11 @@
 
 	let id = null;
 	let persistent = true;
-	// state: { title, description, ordered, sections: [{ title, tasks: [{ text, details, copy? }] }],
+	// state: { title, description, ordered, sections: [{ title, ordered?, tasks: [{ text, details, copy? }] }],
 	//          checked: number[], hideCompleted, hideUpcoming, hideDetails, hideCopy, createdAt }
 	// Task numbers in `checked` count across all sections, in order.
 	let state = null;
-	let rows = []; // one { li, box } per task, in the same order
+	let rows = []; // one { li, box, index, sequential } per task, in the same order
 	let groupViews = []; // one { group, rows, count } per section
 
 	// ---- list format -----------------------------------------------------------
@@ -88,7 +88,7 @@
 			sections = value.sections.map((section) => {
 				const tasks = section && normalizeTasks(section.tasks);
 				const title = section && typeof section.title === "string" ? clip(section.title, LIMITS.maxTitleLength) : "";
-				return tasks && { title, tasks };
+				return tasks && { title, ...(section.ordered === true ? { ordered: true } : {}), tasks };
 			});
 			if (sections.includes(null)) return null;
 		} else {
@@ -105,6 +105,7 @@
 		const ordered = value.ordered === true;
 		let initialChecked = [];
 		let index = 0;
+		const list = { ordered, sections };
 		for (const section of sections) {
 			for (const task of section.tasks) {
 				if (task.done) initialChecked.push(index);
@@ -112,7 +113,7 @@
 			}
 			section.tasks = section.tasks.map(({ text, details, copy }) => ({ text, details, ...(copy ? { copy } : {}) }));
 		}
-		if (ordered) initialChecked = leadingRun(initialChecked);
+		initialChecked = validChecks(list, initialChecked);
 
 		return {
 			title: clip(value.title || "", LIMITS.maxTitleLength),
@@ -123,10 +124,48 @@
 		};
 	}
 
-	// Ordered lists are always completed from the top: keep only the unbroken
-	// run of checks from the first task.
-	function leadingRun(checked) {
-		return checked.filter((i, position) => i === position);
+	// A list without headings is one group: its `ordered` means the tasks are
+	// done in sequence. With headings, it means the sections are.
+	function isSingleGroup(list) {
+		return list.sections.length === 1 && !list.sections[0].title;
+	}
+
+	// Whether the tasks in a section are done one after another.
+	function tasksOrdered(list, section) {
+		return section.ordered === true || (list.ordered && isSingleGroup(list));
+	}
+
+	// Whether a section stays locked until every section before it is done.
+	function sectionsOrdered(list) {
+		return list.ordered && !isSingleGroup(list);
+	}
+
+	// Keep only the checks the list's ordering allows: nothing in a section
+	// until the sections before it are done, and in an ordered section only the
+	// unbroken run of checks from its first task.
+	function validChecks(list, checked) {
+		const have = new Set(checked);
+		const gated = sectionsOrdered(list);
+		const valid = [];
+		let offset = 0;
+		let incomplete = false;
+		for (const section of list.sections) {
+			let kept = 0;
+			if (!(gated && incomplete)) {
+				const ordered = tasksOrdered(list, section);
+				for (let k = 0; k < section.tasks.length; k++) {
+					if (!have.has(offset + k)) {
+						if (ordered) break;
+						continue;
+					}
+					valid.push(offset + k);
+					kept++;
+				}
+			}
+			if (kept < section.tasks.length) incomplete = true;
+			offset += section.tasks.length;
+		}
+		return valid;
 	}
 
 	function totalTasks() {
@@ -201,7 +240,7 @@
 		let checked = Array.isArray(value.checked)
 			? [...new Set(value.checked.filter((i) => Number.isInteger(i) && i >= 0 && i < total))].sort((a, b) => a - b)
 			: [];
-		if (list.ordered) checked = leadingRun(checked);
+		checked = validChecks(list, checked);
 		return {
 			...list,
 			checked,
@@ -380,7 +419,7 @@
 		renderInline(els.description, state.description, true);
 		els.description.hidden = !state.description;
 
-		els.toggleUpcoming.hidden = !state.ordered;
+		els.toggleUpcoming.hidden = !(state.ordered || state.sections.some((section) => section.ordered));
 		const hasDetails = state.sections.some((section) => section.tasks.some((task) => task.details));
 		const hasCopy = state.sections.some((section) => section.tasks.some((task) => task.copy));
 		els.displayMenu.hidden = !hasDetails && !hasCopy;
@@ -403,7 +442,8 @@
 				group.dataset.hasHead = "true";
 			}
 
-			const list = el(state.ordered ? "ol" : "ul", "tasks");
+			const sequential = tasksOrdered(state, section);
+			const list = el(sequential ? "ol" : "ul", "tasks");
 			for (const task of section.tasks) {
 				const index = rows.length;
 				// Only the checkbox toggles the task; the text is ordinary text
@@ -420,9 +460,9 @@
 				text.id = `task-${index}`;
 				box.setAttribute("aria-labelledby", text.id);
 				renderInline(text, task.text, true);
-				if (state.ordered) {
+				if (sequential) {
 					const step = el("span", "step");
-					step.textContent = `Step ${index + 1}`;
+					step.textContent = `Step ${groupRows.length + 1}`;
 					body.append(step);
 				}
 				body.append(text);
@@ -456,10 +496,12 @@
 				li.append(card);
 				if (drawer) li.append(drawer);
 				list.append(li);
-				if (!state.ordered) card.append(dragHandle(task.text));
+				if (!sequential) card.append(dragHandle(task.text));
 				const row = {
 					li,
 					box,
+					index,
+					sequential,
 					sectionIndex,
 					detailsId: task.details ? `task-${index}-details` : "",
 					copyId: task.copy ? `task-${index}-copy` : "",
@@ -476,46 +518,50 @@
 		update();
 	}
 
-	function currentIndex() {
-		// The first unchecked task; in an ordered list it's the only one that
-		// can be checked next.
-		const checked = new Set(state.checked);
-		for (let i = 0; i < rows.length; i++) if (!checked.has(i)) return i;
-		return -1;
-	}
-
 	function update() {
 		const checked = new Set(state.checked);
 		const total = rows.length;
 		const done = state.checked.length;
-		const current = currentIndex();
+		const gated = sectionsOrdered(state);
 		let upcomingHidden = 0;
+		let incomplete = false; // an earlier section isn't done yet
+		const locked = [];
 
-		rows.forEach(({ li, box, detailsId, copyId }, index) => {
-			const isDone = checked.has(index);
-			const upcoming = state.ordered && !isDone && index !== current;
-			box.checked = isDone;
-			box.disabled = upcoming;
-			li.classList.toggle("done", isDone);
-			li.classList.toggle("current", state.ordered && index === current);
-			li.classList.toggle("upcoming", upcoming);
-			const hide = (isDone && state.hideCompleted) || (upcoming && state.hideUpcoming);
-			li.hidden = hide;
-			// Hidden details and copy values (and a done task's) aren't read out either.
-			const described = [state.hideDetails ? "" : detailsId, state.hideCopy || isDone ? "" : copyId].filter(Boolean).join(" ");
-			if (described) box.setAttribute("aria-describedby", described);
-			else box.removeAttribute("aria-describedby");
-			if (upcoming && state.hideUpcoming) upcomingHidden++;
+		groupViews.forEach((view, sectionIndex) => {
+			const sectionLocked = gated && incomplete;
+			locked[sectionIndex] = sectionLocked;
+			// In a sequential section, the first unchecked task is the only one that
+			// can be checked next.
+			let currentFound = false;
+			for (const { li, box, index, sequential, detailsId, copyId } of view.rows) {
+				const isDone = checked.has(index);
+				const current = sequential && !sectionLocked && !isDone && !currentFound;
+				if (current) currentFound = true;
+				const upcoming = !isDone && (sectionLocked || (sequential && !current));
+				box.checked = isDone;
+				box.disabled = upcoming;
+				li.classList.toggle("done", isDone);
+				li.classList.toggle("current", current);
+				li.classList.toggle("upcoming", upcoming);
+				li.hidden = (isDone && state.hideCompleted) || (upcoming && state.hideUpcoming);
+				// Hidden details and copy values (and a done task's) aren't read out either.
+				const described = [state.hideDetails ? "" : detailsId, state.hideCopy || isDone ? "" : copyId].filter(Boolean).join(" ");
+				if (described) box.setAttribute("aria-describedby", described);
+				else box.removeAttribute("aria-describedby");
+				if (upcoming && state.hideUpcoming) upcomingHidden++;
+			}
+			if (view.rows.some(({ index }) => !checked.has(index))) incomplete = true;
 		});
 
-		for (const view of groupViews) {
+		groupViews.forEach((view, sectionIndex) => {
 			const doneHere = view.rows.filter(({ box }) => box.checked).length;
 			if (view.count) {
 				view.count.textContent = doneHere === view.rows.length ? "✓" : `${doneHere}/${view.rows.length}`;
 			}
 			view.group.classList.toggle("complete", doneHere === view.rows.length);
+			view.group.classList.toggle("locked", locked[sectionIndex]);
 			view.group.hidden = view.rows.every(({ li }) => li.hidden);
-		}
+		});
 
 		els.progressText.textContent = `${done} of ${total} done`;
 		els.progressFill.style.transform = `scaleX(${total ? done / total : 0})`;
@@ -764,24 +810,29 @@
 		if (box.checked) {
 			clearToast();
 			state.checked = [...new Set([...state.checked, index])].sort((a, b) => a - b);
-		} else if (state.ordered) {
-			// Unchecking a step reopens it and everything after it, so it asks first:
-			// the step is armed, and unchecking it again goes ahead.
-			const later = state.checked.filter((i) => i > index).length;
+		} else {
+			// Unchecking a step in an ordered section, or a task in an ordered list's
+			// section, can reopen what follows it (the steps after it, and any later
+			// sections that lock again), so that asks first: the task is armed, and
+			// unchecking it again goes ahead.
+			const rest = state.checked.filter((i) => i !== index);
+			const kept = validChecks(state, rest);
+			const later = rest.length - kept.length;
 			if (later > 0) {
+				const noun = rows[index].sequential ? "step" : "task";
+				const after = later === 1 ? noun : `${later} ${noun}s`;
 				if (armed?.target !== row) {
-					const prompt = `Uncheck again to reopen this step and the ${later === 1 ? "step" : `${later} steps`} after it`;
 					box.checked = true;
 					row.classList.add("armed");
-					arm(row, prompt, () => row.classList.remove("armed"));
+					arm(row, `Uncheck again to reopen this ${noun} and the ${after} after it`, () => row.classList.remove("armed"));
 					return;
 				}
 				disarm();
 				const before = state.checked;
 				undoable(
-					`Reopened this step and the ${later === 1 ? "step" : `${later} steps`} after it`,
+					`Reopened this ${noun} and the ${after} after it`,
 					() => {
-						state.checked = before.filter((i) => i < index);
+						state.checked = kept;
 						save();
 						update();
 					},
@@ -794,10 +845,7 @@
 				return;
 			}
 			clearToast();
-			state.checked = state.checked.filter((i) => i < index);
-		} else {
-			clearToast();
-			state.checked = state.checked.filter((i) => i !== index);
+			state.checked = rest;
 		}
 		save();
 		update();
@@ -951,14 +999,19 @@
 					...(done ? { done: true } : {}),
 				};
 			});
-			return { ...(section.title ? { title: section.title } : {}), tasks };
+			return { ...(section.title ? { title: section.title } : {}), ...(section.ordered ? { ordered: true } : {}), tasks };
 		});
 		const body = { v: 1 };
 		if (state.title) body.title = state.title;
 		if (state.description) body.description = state.description;
-		if (state.ordered) body.ordered = true;
-		if (sections.length === 1 && !state.sections[0].title) body.tasks = sections[0].tasks;
-		else body.sections = sections;
+		if (isSingleGroup(state)) {
+			// Without headings, only the list can be ordered.
+			if (tasksOrdered(state, state.sections[0])) body.ordered = true;
+			body.tasks = sections[0].tasks;
+		} else {
+			if (state.ordered) body.ordered = true;
+			body.sections = sections;
+		}
 		return body;
 	}
 
@@ -1071,8 +1124,9 @@
 		for (const section of state.sections) {
 			lines.push("");
 			if (section.title) lines.push(`## ${oneLine(section.title)}`, "");
-			for (const task of section.tasks) {
-				const marker = state.ordered ? `${index + 1}.` : "-";
+			const sequential = tasksOrdered(state, section);
+			section.tasks.forEach((task, k) => {
+				const marker = sequential ? `${k + 1}.` : "-";
 				const indent = " ".repeat(marker.length + 1);
 				lines.push(`${marker} [${checked.has(index) ? "x" : " "}] ${oneLine(task.text)}`);
 				if (task.details) {
@@ -1089,7 +1143,7 @@
 					}
 				}
 				index++;
-			}
+			});
 		}
 		return lines.join("\n") + "\n";
 	}
@@ -1182,7 +1236,7 @@
 			}
 		});
 		mapped.sort((a, b) => a - b);
-		if (state.ordered) mapped = leadingRun(mapped);
+		mapped = validChecks(state, mapped);
 
 		const have = new Set(state.checked);
 		if (mapped.every((i) => have.has(i))) return;

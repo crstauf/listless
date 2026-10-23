@@ -80,10 +80,13 @@ Errors return 400 (or 413 for an oversized body) with {"error": "..."}.
 - description: optional. Shown under the title, with line breaks kept. When
   you know the address of the conversation the list came from, put it here
   so the user can get back to it. Keep it to a sentence or two.
-- ordered: optional, default false. In an ordered list, tasks must be done in
-  sequence: only the next unfinished task can be checked off, and later ones
-  are locked until it is. Use it when order matters (setup steps, a
-  procedure); leave it out for a set of independent to-dos.
+- ordered: optional, default false. Use it when order matters (setup steps, a
+  procedure); leave it out for a set of independent to-dos. Without
+  "sections", an ordered list's tasks must be done in sequence: only the next
+  unfinished task can be checked off, and later ones are locked until it is.
+  With "sections", it means the sections are done in order: a section stays
+  locked until every section before it is done. Tasks inside a section are
+  in any order unless that section is ordered too (see below).
 - tasks: each task is either a string, or an object with muted extra detail:
 
       "Buy milk"
@@ -102,7 +105,9 @@ Errors return 400 (or 413 for an oversized body) with {"error": "..."}.
       {"text": "Email Dana the invoice", "copy": "dana@example.com"}
 
   Add "done": true to an object task that is already complete; it starts out
-  checked off. In an ordered list, done tasks must come before all others.
+  checked off. Done tasks must come first in an ordered list without sections
+  or in an ordered section, and a section of an ordered list can only have
+  done tasks once the sections before it are done.
 
       {"text": "Draft the outline", "done": true}
 
@@ -113,12 +118,28 @@ To group tasks under headings, use "sections" instead of "tasks":
       "title": "Ship the release",
       "ordered": true,
       "sections": [
-        {"title": "Prepare", "tasks": ["Review the PR", {"text": "Bump the version", "details": "Edit \`package.json\`."}]},
-        {"title": "Release", "tasks": ["Merge to \`main\`", "Run \`npm publish\`"]}
+        {"title": "Prepare", "ordered": true, "tasks": ["Review the PR", {"text": "Bump the version", "details": "Edit \`package.json\`."}]},
+        {"title": "Release", "ordered": true, "tasks": ["Merge to \`main\`", "Run \`npm publish\`"]}
       ]
     }
 
-Order in an ordered list runs across all sections.
+A section can also be "ordered": true, which means its tasks are done in
+sequence. The two are independent, so a list can mix them: sections that go in
+any order or in order, each holding tasks in any order or in sequence.
+
+    {
+      "v": 1,
+      "title": "Set up the project",
+      "ordered": true,
+      "sections": [
+        {"title": "Gather", "tasks": ["Find the API key", "Find the deploy token"]},
+        {"title": "Install", "ordered": true, "tasks": ["Clone the repo", "Run \`npm install\`", "Run \`npm test\`"]}
+      ]
+    }
+
+Here "Install" stays locked until "Gather" is done, and its steps then go in
+order. For one sequence across the whole list, as in the "Ship the release"
+example above, set "ordered" on every section too.
 
 Text is plain: Markdown and HTML are shown literally, with two exceptions:
 

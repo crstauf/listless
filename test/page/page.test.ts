@@ -85,6 +85,88 @@ describe("ordered lists", () => {
 	});
 });
 
+describe("ordered sections", () => {
+	const setup = {
+		title: "Setup",
+		ordered: true,
+		sections: [
+			{ title: "Gather", tasks: ["Key", "Token"] },
+			{ title: "Install", ordered: true, tasks: ["Clone", "Build", "Test"] },
+		],
+	};
+	const locked = (page: Page) => Promise.all([0, 1, 2, 3, 4].map((i) => input(page, i).isDisabled()));
+
+	it("locks a section until the ones before it are done, then runs its steps in order", async () => {
+		const { open } = await session();
+		const page = await open(linkFor(setup));
+		expect(await locked(page)).toEqual([false, false, true, true, true]);
+		await toggle(page, 1); // tasks within an unordered section go in any order
+		await toggle(page, 0);
+		expect(await locked(page)).toEqual([false, false, false, true, true]);
+		expect(await page.locator("#list .step").allTextContents()).toEqual(["Step 1", "Step 2", "Step 3"]);
+	});
+
+	it("only gives handles to sections that aren't ordered", async () => {
+		const { open } = await session();
+		const page = await open(linkFor(setup));
+		expect(await page.locator("#list .handle").count()).toBe(2);
+	});
+
+	it("reopens later sections when an earlier task is unchecked, after asking", async () => {
+		const { open } = await session();
+		const page = await open(linkFor(setup));
+		for (const i of [0, 1, 2, 3]) await toggle(page, i);
+		expect(await checks(page)).toEqual([true, true, true, true, false]);
+
+		await toggle(page, 0);
+		expect(await checks(page)).toEqual([true, true, true, true, false]);
+		expect(await page.locator("#announce").textContent()).toContain("Uncheck again to reopen this task and the 2 tasks after it");
+		await toggle(page, 0);
+		expect(await checks(page)).toEqual([false, true, false, false, false]);
+		await page.locator("#toast-undo").click();
+		expect(await checks(page)).toEqual([true, true, true, true, false]);
+	});
+
+	it("leaves the tasks of an unordered list's sections free when only the list is ordered", async () => {
+		const { open } = await session();
+		const page = await open(linkFor({ ordered: true, sections: [{ title: "A", tasks: ["a", "b"] }, { title: "B", tasks: ["c"] }] }));
+		expect(await Promise.all([0, 1, 2].map((i) => input(page, i).isDisabled()))).toEqual([false, false, true]);
+		await toggle(page, 1);
+		await toggle(page, 0);
+		expect(await checks(page)).toEqual([true, true, false]);
+	});
+
+	it("starts done tasks checked only where the ordering allows", async () => {
+		const { open } = await session();
+		const page = await open(
+			linkFor({
+				ordered: true,
+				sections: [
+					{ title: "A", tasks: [{ text: "a", done: true }, "b"] },
+					{ title: "B", tasks: [{ text: "c", done: true }] },
+				],
+			}),
+		);
+		expect(await checks(page)).toEqual([true, false, false]);
+	});
+
+	it("carries section ordering into the Markdown and the share link", async () => {
+		const { open } = await session();
+		const page = await open(linkFor(setup));
+		await page.locator("#copy").click();
+		await page.locator("#copy.flash").waitFor();
+		const markdown = await page.evaluate(() => navigator.clipboard.readText());
+		expect(markdown).toBe("# Setup\n\n## Gather\n\n- [ ] Key\n- [ ] Token\n\n## Install\n\n1. [ ] Clone\n2. [ ] Build\n3. [ ] Test\n");
+
+		await page.locator("#share").click();
+		await page.locator("#share.flash").waitFor();
+		const shared = await page.evaluate(() => navigator.clipboard.readText());
+		const other = await (await session()).open(shared);
+		await other.waitForURL(ID_URL);
+		expect(await other.locator("#list .step").count()).toBe(3);
+	});
+});
+
 describe("reordering", () => {
 	it("moves a task with the arrow keys, and its check mark with it", async () => {
 		const { open } = await session();
