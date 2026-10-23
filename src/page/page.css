@@ -419,16 +419,24 @@ main {
 	text-underline-offset: 2px;
 }
 
+.group {
+	display: flow-root;
+}
+
 .group + .group {
 	margin-top: 28px;
 }
 
 .group-head {
 	display: flex;
-	justify-content: space-between;
 	align-items: center;
-	gap: 12px;
+	gap: 4px;
 	margin: 0 4px 10px;
+	transition: margin 250ms ease;
+}
+
+.group.collapsed .group-head {
+	margin-bottom: 0;
 }
 
 .group-head h2 {
@@ -441,8 +449,27 @@ main {
 	overflow-wrap: anywhere;
 }
 
+/* The chevron sits right beside the title; the count is pushed to the far end. */
+.group-head button.collapse {
+	flex: none;
+	width: 28px;
+	height: 28px;
+	margin: -4px 0;
+}
+
+.group-head button.collapse svg {
+	width: 18px;
+	height: 18px;
+	transition: transform 250ms ease;
+}
+
+.group.collapsed .group-head button.collapse svg {
+	transform: rotate(-90deg);
+}
+
 .group-count {
 	flex: none;
+	margin-left: auto;
 	min-width: 2.25rem;
 	padding: 1px 8px;
 	border-radius: 999px;
@@ -463,6 +490,32 @@ main {
 	border-color: transparent;
 	color: var(--accent-strong);
 	font-weight: 700;
+}
+
+/* Collapses like the copy drawer. The wrapper clips, so it is padded out (and
+   pulled back with a negative margin) to leave room for card shadows and the
+   checkbox hint; its padding must not catch clicks meant for what is beneath. */
+.group-body {
+	display: grid;
+	grid-template-rows: minmax(0, 1fr);
+	margin: -36px -12px;
+	padding: 36px 12px;
+	overflow: hidden;
+	pointer-events: none;
+	transition: grid-template-rows 250ms ease, margin 250ms ease, padding 250ms ease, visibility 0s;
+}
+
+.group-body > .tasks {
+	min-height: 0;
+	pointer-events: auto;
+}
+
+.group.collapsed .group-body {
+	grid-template-rows: minmax(0, 0fr);
+	margin-block: 0;
+	padding-block: 0;
+	visibility: hidden;
+	transition: grid-template-rows 250ms ease, margin 250ms ease, padding 250ms ease, visibility 0s 250ms;
 }
 
 .tasks {
@@ -492,6 +545,7 @@ main {
 /* Only the checkbox toggles a task. Its padding makes a 44px tap target
    without moving the box. */
 .tasks .check {
+	position: relative;
 	flex: none;
 	display: grid;
 	padding: 10px;
@@ -874,6 +928,35 @@ h1 code {
 	.tasks .copy button.icon:focus-visible,
 	.tasks .copy button.icon.flash {
 		opacity: 1;
+	}
+
+	/* The last open checkbox in a section says an Alt-click finishes the
+	   section, as soon as its task is hovered. */
+	.tasks .card:hover .check[data-hint]::after {
+		content: attr(data-hint);
+		position: absolute;
+		left: 0;
+		bottom: calc(100% + 4px);
+		z-index: 2;
+		padding: 5px 9px;
+		border-radius: 8px;
+		background: var(--text);
+		color: var(--bg);
+		font-size: 0.75rem;
+		line-height: 1.3;
+		white-space: nowrap;
+		pointer-events: none;
+		animation: hint-in 120ms backwards;
+	}
+
+	.tasks .shifting .check[data-hint]::after {
+		display: none;
+	}
+
+	@keyframes hint-in {
+		from {
+			opacity: 0;
+		}
 	}
 
 	.tasks .handle {

@@ -49,7 +49,8 @@
 	let id = null;
 	let persistent = true;
 	// state: { title, description, ordered, sections: [{ title, ordered?, tasks: [{ text, details, copy? }] }],
-	//          checked: number[], hideCompleted, hideUpcoming, hideDetails, hideCopy, createdAt }
+	//          checked: number[], hideCompleted, hideUpcoming, hideDetails, hideCopy,
+	//          collapsed: number[] (section indices, saved here only, never in a link), createdAt }
 	// Task numbers in `checked` count across all sections, in order.
 	let state = null;
 	let rows = []; // one { li, box, index, sequential } per task, in the same order
@@ -272,6 +273,9 @@
 			hideUpcoming: value.hideUpcoming === true,
 			hideDetails: value.hideDetails === true,
 			hideCopy: value.hideCopy === true,
+			collapsed: Array.isArray(value.collapsed)
+				? [...new Set(value.collapsed.filter((i) => Number.isInteger(i) && list.sections[i]?.title))].sort((a, b) => a - b)
+				: [],
 			createdAt: typeof value.createdAt === "string" ? value.createdAt : new Date().toISOString(),
 		};
 	}
@@ -284,6 +288,7 @@
 			hideUpcoming: false,
 			hideDetails: false,
 			hideCopy: false,
+			collapsed: [],
 			createdAt: new Date().toISOString(),
 		};
 	}
@@ -407,6 +412,16 @@
 		return box;
 	}
 
+	function chevron() {
+		const svg = document.createElementNS(SVG_NS, "svg");
+		const path = document.createElementNS(SVG_NS, "path");
+		svg.setAttribute("viewBox", "0 0 24 24");
+		svg.setAttribute("aria-hidden", "true");
+		path.setAttribute("d", "M6 9l6 6 6-6");
+		svg.append(path);
+		return svg;
+	}
+
 	// Same icon as the Copy as Markdown button: idle, then a check while flashing.
 	const copyIcon = () => els.copy.querySelector("svg").cloneNode(true);
 
@@ -460,14 +475,20 @@
 				const head = el("div", "group-head");
 				const heading = el("h2");
 				const count = el("span", "group-count");
+				const toggle = el("button", "icon collapse");
+				toggle.type = "button";
+				toggle.dataset.section = String(sectionIndex);
+				toggle.setAttribute("aria-controls", `section-${sectionIndex}-tasks`);
+				toggle.append(chevron());
 				renderInline(heading, section.title);
-				head.append(heading, count);
+				head.append(heading, toggle, count);
 				group.append(head);
 				group.dataset.hasHead = "true";
 			}
 
 			const sequential = tasksOrdered(state, section);
 			const list = el(sequential ? "ol" : "ul", "tasks");
+			list.id = `section-${sectionIndex}-tasks`;
 			for (const task of section.tasks) {
 				const index = rows.length;
 				// Only the checkbox toggles the task; the text is ordinary text
@@ -538,20 +559,31 @@
 					index,
 					sequential,
 					sectionIndex,
+					label,
 					detailsId: task.details ? `task-${index}-details` : "",
 					copyId: copies.map((_, k) => `task-${index}-copy-${k}`).join(" "),
 				};
 				rows.push(row);
 				groupRows.push(row);
 			}
-			group.append(list);
-			return { group, rows: groupRows, count: group.querySelector(".group-count") };
+			// The wrapper is what collapses; the list inside keeps its own layout.
+			const body = el("div", "group-body");
+			body.append(list);
+			group.append(body);
+			return {
+				group,
+				rows: groupRows,
+				count: group.querySelector(".group-count"),
+				toggle: group.querySelector(".collapse"),
+			};
 		});
 
 		els.list.replaceChildren(...groups.map((g) => g.group));
 		groupViews = groups;
 		update();
 	}
+
+	const FINISH_HINT = `${/Mac|iPhone|iPad/.test(navigator.platform) ? "⌥" : "Alt"}-click to check off and collapse`;
 
 	function update() {
 		const checked = new Set(state.checked);
@@ -595,6 +627,22 @@
 			}
 			view.group.classList.toggle("complete", doneHere === view.rows.length);
 			view.group.classList.toggle("locked", locked[sectionIndex]);
+			if (view.toggle) {
+				const collapsed = state.collapsed.includes(sectionIndex);
+				const name = collapsed ? "Expand section" : "Collapse section";
+				view.group.classList.toggle("collapsed", collapsed);
+				view.toggle.setAttribute("aria-expanded", String(!collapsed));
+				view.toggle.setAttribute("aria-label", name);
+				view.toggle.title = name;
+			}
+			// When one task is all that's left in a section, its checkbox hints that
+			// an Alt-click finishes it and folds the section away.
+			const open = view.rows.filter(({ box }) => !box.checked);
+			const finishing = view.toggle && view.rows.length > 1 && open.length === 1 && !open[0].box.disabled ? open[0] : null;
+			for (const row of view.rows) {
+				if (row === finishing) row.label.dataset.hint = FINISH_HINT;
+				else delete row.label.dataset.hint;
+			}
 			view.group.hidden = view.rows.every(({ li }) => li.hidden);
 		});
 
@@ -835,9 +883,39 @@
 
 	// ---- actions ---------------------------------------------------------------
 
+	// Whether Alt was held when the checkbox was pressed: the change event doesn't say.
+	let altPress = false;
+	els.list.addEventListener("pointerdown", (event) => (altPress = event.altKey), true);
+	els.list.addEventListener("keydown", () => (altPress = false), true);
+
+	els.list.addEventListener("click", (event) => {
+		// Firefox doesn't pass a label's click on to its checkbox while a modifier
+		// key is held, so an Alt-click toggles the checkbox itself.
+		const label = event.altKey && event.target instanceof Element && event.target.closest(".check");
+		if (label && event.target !== label.querySelector("input")) {
+			event.preventDefault();
+			label.querySelector("input").click();
+			return;
+		}
+		const button = event.target instanceof Element && event.target.closest(".collapse");
+		if (!button) return;
+		const index = Number(button.dataset.section);
+		const collapse = !state.collapsed.includes(index);
+		// Alt applies the same change to every titled section.
+		const targets = event.altKey ? state.sections.flatMap((section, i) => (section.title ? [i] : [])) : [index];
+		const rest = state.collapsed.filter((i) => !targets.includes(i));
+		state.collapsed = collapse ? [...rest, ...targets].sort((a, b) => a - b) : rest;
+		// Focus inside a section that just folded away would be lost.
+		if (collapse && button.closest(".group").contains(document.activeElement)) button.focus();
+		save();
+		update();
+	});
+
 	els.list.addEventListener("change", (event) => {
 		const box = event.target;
 		if (!(box instanceof HTMLInputElement)) return;
+		const alt = altPress;
+		altPress = false;
 		const index = Number(box.dataset.index);
 		const row = box.closest(".task");
 		if (armed && armed.target !== row) disarm();
@@ -884,6 +962,19 @@
 		}
 		save();
 		update();
+
+		// Alt-checking the last open task of a titled section folds it away, a beat
+		// later so the check mark shows first.
+		const { sectionIndex } = rows[index];
+		const view = groupViews[sectionIndex];
+		if (alt && box.checked && view.toggle && view.rows.every(({ box }) => box.checked) && !state.collapsed.includes(sectionIndex)) {
+			setTimeout(() => {
+				if (!state || groupViews[sectionIndex] !== view || state.collapsed.includes(sectionIndex)) return;
+				state.collapsed = [...state.collapsed, sectionIndex].sort((a, b) => a - b);
+				save();
+				update();
+			}, 300);
+		}
 	});
 
 	// One click selects a whole code span or copy value, ready to copy.
