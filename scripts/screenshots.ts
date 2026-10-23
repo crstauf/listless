@@ -56,6 +56,8 @@ try {
 		await page.waitForURL(/\/l\/[A-Za-z0-9_-]+$/);
 		// Finish "Prepare", which unlocks "Release" and its first step.
 		for (const index of [0, 1]) await page.locator(".task .box").nth(index).click();
+		// Hovering a copy row is what shows its copy button.
+		await page.locator(".copy").first().hover();
 		await page.waitForTimeout(600); // let the check mark finish drawing
 		const path = new URL(`preview-${scheme}.png`, out).pathname;
 		await page.screenshot({ path, clip: { x: 0, y: 0, width, height }, animations: "disabled" });
