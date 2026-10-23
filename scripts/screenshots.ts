@@ -56,8 +56,14 @@ try {
 		await page.waitForURL(/\/l\/[A-Za-z0-9_-]+$/);
 		// Finish "Prepare", which unlocks "Release" and its first step.
 		for (const index of [0, 1]) await page.locator(".task .box").nth(index).click();
-		// Hovering a copy row is what shows its copy button.
-		await page.locator(".copy").first().hover();
+		// The grab handle and copy button only show on hover, and the pointer can only
+		// be in one place, so show one of each by hand (setting style through the DOM
+		// is allowed by the page's CSP).
+		await page.evaluate(`
+			for (const button of [document.querySelectorAll(".task")[1].querySelector(".handle"), document.querySelector(".copy button")]) {
+				button.style.opacity = "1";
+			}
+		`);
 		await page.waitForTimeout(600); // let the check mark finish drawing
 		const path = new URL(`preview-${scheme}.png`, out).pathname;
 		await page.screenshot({ path, clip: { x: 0, y: 0, width, height }, animations: "disabled" });
