@@ -537,10 +537,10 @@ main {
 }
 
 .tasks .copy {
-	display: flex;
+	display: grid;
+	grid-template-columns: subgrid;
+	grid-column: 1 / -1;
 	align-items: center;
-	gap: 8px;
-	margin: 0 16px 0 54px;
 	padding: 0.5em 0.5em 0.5em 0.8em;
 	border: 1px solid var(--border);
 	border-top: 0;
@@ -554,6 +554,9 @@ main {
 
 /* Wraps the rows so the whole stack slides and collapses as one. */
 .tasks .copies {
+	display: grid;
+	grid-template-columns: fit-content(40%) minmax(0, 1fr) auto;
+	margin: 0 16px 0 54px;
 	min-height: 0;
 	align-self: start;
 	transition: transform 250ms ease;
@@ -588,14 +591,14 @@ main {
 }
 
 .tasks .copy + .copy {
-	border-top: 1px solid var(--border);
+	border-top: 0.5px solid color-mix(in srgb, var(--border) 50%, transparent);
 }
 
 .tasks .copy-label {
-	flex: none;
-	max-width: 40%;
+	grid-column: 1;
+	padding-right: 0.8em;
 	overflow-wrap: anywhere;
-	color: var(--faint);
+	color: color-mix(in srgb, var(--faint) 75%, var(--drawer-bg));
 	font-size: 0.6875rem;
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
@@ -603,8 +606,13 @@ main {
 	user-select: none;
 }
 
+/* Without a label the value takes the label's column too. */
+.tasks .copy-value:first-child {
+	grid-column: 1 / span 2;
+}
+
 .tasks .copy-value {
-	flex: 1;
+	grid-column: 2;
 	min-width: 0;
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
@@ -615,10 +623,10 @@ main {
 /* The button's box is taller than a line of text, so it overlaps the drawer's
    padding instead of making the drawer taller. */
 .tasks .copy button.icon {
-	flex: none;
+	grid-column: 3;
 	width: 28px;
 	height: 28px;
-	margin: -5px 0;
+	margin: -5px 0 -5px 8px;
 }
 
 .tasks .copy button.icon svg {
