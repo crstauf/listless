@@ -135,9 +135,9 @@ You don't have to take this README's word for it:
 1. **View the page source.** The `<meta http-equiv="Content-Security-Policy">` tag includes `default-src 'none'` and `connect-src 'none'`. Together they block every fetch, XHR, WebSocket, beacon, form submission and external resource. It also includes `require-trusted-types-for 'script'`, so the browser refuses to turn a string into HTML or script. The same policy is sent as a response header.
 2. **Watch the Network tab** in your browser's developer tools while you open a list and check things off. After the page loads, there are no requests, unless you click a link in the list, which opens in a new tab.
 3. **Read the code.** The whole page is [`src/page/`](src/page/), and the Worker is [`src/index.ts`](src/index.ts). The tests check that the policy forbids network access, that its hashes match the page's only inline script and style, and that the Worker has no storage bindings. The browser tests in [`test/page/`](test/page/) drive the page in Chromium and fail on any Content-Security-Policy violation, console error or pop-up dialog.
-4. **Check the deploy.** The hosted Worker is deployed only by [this repository's workflow](.github/workflows/deploy.yml) from `master`, and Workers logging is turned off in [`wrangler.jsonc`](wrangler.jsonc).
+4. **Know what you can't check.** There is no way to confirm that the hosted Worker is the code in this repository. [The workflow](.github/workflows/deploy.yml) deploys from `master`, and Workers logging is turned off in [`wrangler.jsonc`](wrangler.jsonc), but that is how it's meant to be deployed, not something you can verify: whoever controls the Cloudflare account could deploy different code. Checks 1 and 2 test the page you actually received, but only when you run them, and they can't tell you what the server sends someone else or next time. The Worker's own behavior (the `POST` endpoint and the headers) you have to take on trust.
 
-Or run it yourself (see below).
+If that isn't good enough, run it yourself (see below).
 
 ## Run it yourself
 
