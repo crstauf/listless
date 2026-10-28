@@ -5,6 +5,7 @@
 // Run `npm run screenshots`; the first time, install the browser with
 // `npx playwright install chromium`.
 
+import { fileURLToPath } from "node:url";
 import { deflateRawSync } from "node:zlib";
 import { chromium } from "playwright";
 import { PAGE_CSP, PAGE_HTML } from "../src/page.generated.ts";
@@ -65,7 +66,7 @@ try {
 			}
 		`);
 		await page.waitForTimeout(600); // let the check mark finish drawing
-		const path = new URL(`preview-${scheme}.png`, out).pathname;
+		const path = fileURLToPath(new URL(`preview-${scheme}.png`, out));
 		await page.screenshot({ path, clip: { x: 0, y: 0, width, height }, animations: "disabled" });
 		console.log(`Wrote docs/preview-${scheme}.png`);
 		await page.close();
