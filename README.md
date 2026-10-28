@@ -25,13 +25,13 @@ Give an agent a wall of text, let it pull out the tasks, and get back a link to 
    https://<host>/l/#v1.<data>
    ```
 
-   `<data>` is `base64url(deflate-raw(JSON))`, and the JSON is a list such as `{"v":1,"title":"…","tasks":["…","…"]}` (see [List format](#list-format)). Browsers never send the part after `#` to a server.
+   `<data>` is `base64url(deflate-raw(JSON))`, and the JSON is a list such as `{"v":1,"title":"…","tasks":["…","…"]}` (see [List format](#list-format)). An agent that can't compress can instead write `https://<host>/l/#json=<percent-encoded JSON>`. Browsers never send the part after `#` to a server.
 
-2. You open the link. The page reads the list from the address, saves it in your browser, and swaps the address for a short one: `https://<host>/l/<id>`. The id is a hash of the list's contents, so opening the same original link again finds the same list and keeps your check marks and any reordering, because the id is fixed when you first open the list. Check marks never affect it, but a link whose tasks are in a different order (such as a share link from a list someone reordered) is a different list. If the link marks tasks done that your saved copy hasn't checked, the page tells you and offers to use the link's check marks; your saved copy is never changed without you asking.
+2. You open the link. The page reads the list from the address, saves it in your browser, and swaps the address for a short one: `https://<host>/l/<id>`. The id is a hash of the list's contents, so opening the same original link again finds the same list and keeps your check marks and any reordering, because the id is fixed when you first open the list. Check marks never affect it. A link can also name the list it updates with an `id` (a share link does), and then it opens that list whatever its contents; a link with no `id` and different contents is a different list. Your saved copy is never changed without you asking: if the link marks tasks done that you haven't checked, the page offers to add them to your check marks, and if the link says something different (an agent edited it), the page offers to use that version, keeping your check marks on the tasks it still has. **Undo** brings the old version back.
 
 3. You check things off. Everything is saved in your browser as you go. Opening `https://<host>/l/` lists every list saved in this browser, with its progress, so you can find one again or delete it.
 
-The page shows progress overall and per section. Tasks in sections that aren't ordered can be reordered within their section by dragging the handle beside them, or with the arrow keys when it's focused. Its toolbar has **Copy as Markdown** (to paste your progress back to an agent), **Copy share link** (a full link carrying the list as it is now, with its order and check marks; building it happens in your browser and sends nothing), **Hide completed**, **Hide upcoming** (when anything is ordered), a **Display** button (hover it, or tap it, for **Hide details** and **Hide copy text**), **Uncheck all**, and **Delete**. Those last two, and unchecking an ordered step that has later steps checked, don't use pop-up dialogs: the first click turns the control red with a check mark, and a second click goes ahead (clicking anywhere else, pressing Escape, or waiting a few seconds cancels). Afterwards, an **Undo** button (or Ctrl/⌘+Z) brings the change back until you change something else; a deleted list can be restored the same way. Each titled section has a chevron beside its title that folds it away: Alt-click (⌥-click on a Mac) a chevron to fold or open every section, or Alt-click the last open checkbox in a section to check it off and fold the section in one go (hovering that checkbox says so). Which sections are folded is kept in your browser only: it is never part of a link, a share link or the list's id. Only the checkbox toggles a task, so the text can be selected like any other text. Web addresses in it are links, and clicking a code span or a copy value selects all of it, ready to copy.
+The page shows progress overall and per section. Tasks in sections that aren't ordered can be reordered within their section by dragging the handle beside them, or with the arrow keys when it's focused. Its toolbar has **Copy as Markdown** (to paste your progress to an agent; it ends with a note on how to answer with an updated link, and a share link, all built in your browser), **Copy share link** (a full link carrying the list as it is now, with its order, check marks and its `id`, so a link an agent edits and hands back updates this list; building it happens in your browser and sends nothing), **Hide completed**, **Hide upcoming** (when anything is ordered), a **Display** button (hover it, or tap it, for **Hide details** and **Hide copy text**), **Uncheck all**, and **Delete**. Those last two, and unchecking an ordered step that has later steps checked, don't use pop-up dialogs: the first click turns the control red with a check mark, and a second click goes ahead (clicking anywhere else, pressing Escape, or waiting a few seconds cancels). Afterwards, an **Undo** button (or Ctrl/⌘+Z) brings the change back until you change something else; a deleted list can be restored the same way. Each titled section has a chevron beside its title that folds it away: Alt-click (⌥-click on a Mac) a chevron to fold or open every section, or Alt-click the last open checkbox in a section to check it off and fold the section in one go (hovering that checkbox says so). Which sections are folded is kept in your browser only: it is never part of a link, a share link or the list's id. Only the checkbox toggles a task, so the text can be selected like any other text. Web addresses in it are links, and clicking a code span or a copy value selects all of it, ready to copy.
 
 ## List format
 
@@ -48,6 +48,7 @@ The page shows progress overall and per section. Tasks in sections that aren't o
 }
 ```
 
+- **`id`**: optional, 12 characters (`A-Z a-z 0-9 - _`). Only a share link has one: it names the saved list the link updates (see [Updating a list](#updating-a-list)). Leave it out of a new list. It isn't content, so it never changes a list's id.
 - **`title`**: optional.
 - **`description`**: optional. It's shown under the title, which makes it a good place for a link back to the conversation the list came from.
 - **`ordered`**: optional. When `true`, things are done in sequence. In a list without sections, only the next unfinished task can be checked off, and the ones after it stay locked. With sections, each section stays locked until every section before it is done. Unchecking a step reopens it and everything after it.
@@ -80,7 +81,7 @@ For a single sequence across the whole list, as in the first example, set `order
 
 ## For agents
 
-`GET /` on any Listless host returns plain-text instructions written for agents. In short, there are two ways to make a link:
+`GET /` on any Listless host returns plain-text instructions written for agents. In short, there are three ways to make a link:
 
 **Build it locally (preferred).** Nothing is sent anywhere:
 
@@ -89,6 +90,8 @@ echo '{"title":"Groceries","tasks":["Milk","Eggs"]}' | node -e 'let s="";process
 ```
 
 `GET /` also includes a Python version.
+
+**Or write it by hand, with no code and no network.** For agents that can't run code, put the list as URL-encoded JSON after `#json=`: `https://<host>/l/#json=%7B%22title%22%3A%22Groceries%22%2C%22tasks%22%3A%5B%22Milk%22%2C%22Eggs%22%5D%7D`. The page reads it the same way as a compressed link, including the `id` below. It's longer, so use the other ways when you can.
 
 **Or POST it.** This is the only time the Worker sees the tasks. It compresses them into the link and keeps nothing:
 
@@ -106,6 +109,14 @@ Limits:
 - Description up to 2,000 characters.
 - POST bodies up to 256 KB.
 
+### Updating a list
+
+An agent can't read `/l/<id>`: the list lives in your browser. Instead, give it a share link (**Copy share link**). It decodes the link, adds `"done": true` to the tasks it finished (or edits the list), keeps the `id` as it is, and hands back a new link. Opening that link takes you to the same `/l/<id>` and offers the changes (see [How it works](#how-it-works)). If you paste the list as Markdown instead (**Copy as Markdown**), an agent that can't run code reads the tasks and the `id` from it and writes the new link by hand. Every page also carries a short note for agents that points to `GET /`, and `GET /` has the decode commands and the rules for agents.
+
+```sh
+echo '<the share link>' | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(require("zlib").inflateRawSync(Buffer.from(s.trim().split("#v1.")[1],"base64url")).toString()))'
+```
+
 ## Network traffic, exactly
 
 | Situation | Requests |
@@ -114,7 +125,7 @@ Limits:
 | Using `POST /api/lists` | One `POST` with the tasks; the response is the link. Nothing is stored or logged. |
 | Reopening `/l/<id>` | One `GET` for the page. The list stays in your browser. |
 | Opening `/l/` (your lists) | One `GET` for the page. The index is read from your browser's storage. |
-| Copy share link | None. The link is built in your browser and copied to the clipboard; opening it somewhere else is the same as opening any other link. |
+| Copy share link | None. The link is built in your browser and copied to the clipboard; opening it somewhere else is the same as opening any other link, and in a browser that already has the list it opens that list. |
 | Clicking a link in a list | The linked site opens in a new tab, with no referrer, so it doesn't learn which list you came from. Nothing happens until you click. |
 
 ## How to verify
@@ -124,9 +135,9 @@ You don't have to take this README's word for it:
 1. **View the page source.** The `<meta http-equiv="Content-Security-Policy">` tag includes `default-src 'none'` and `connect-src 'none'`. Together they block every fetch, XHR, WebSocket, beacon, form submission and external resource. It also includes `require-trusted-types-for 'script'`, so the browser refuses to turn a string into HTML or script. The same policy is sent as a response header.
 2. **Watch the Network tab** in your browser's developer tools while you open a list and check things off. After the page loads, there are no requests, unless you click a link in the list, which opens in a new tab.
 3. **Read the code.** The whole page is [`src/page/`](src/page/), and the Worker is [`src/index.ts`](src/index.ts). The tests check that the policy forbids network access, that its hashes match the page's only inline script and style, and that the Worker has no storage bindings. The browser tests in [`test/page/`](test/page/) drive the page in Chromium and fail on any Content-Security-Policy violation, console error or pop-up dialog.
-4. **Check the deploy.** The hosted Worker is deployed only by [this repository's workflow](.github/workflows/deploy.yml) from `master`, and Workers logging is turned off in [`wrangler.jsonc`](wrangler.jsonc).
+4. **Know what you can't check.** There is no way to confirm that the hosted Worker is the code in this repository. [The workflow](.github/workflows/deploy.yml) deploys from `master`, and Workers logging is turned off in [`wrangler.jsonc`](wrangler.jsonc), but that is how it's meant to be deployed, not something you can verify: whoever controls the Cloudflare account could deploy different code. Checks 1 and 2 test the page you actually received, but only when you run them, and they can't tell you what the server sends someone else or next time. The Worker's own behavior (the `POST` endpoint and the headers) you have to take on trust.
 
-Or run it yourself (see below).
+If that isn't good enough, run it yourself (see below).
 
 ## Run it yourself
 

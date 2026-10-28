@@ -7,11 +7,15 @@
 <meta name="color-scheme" content="light dark">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
+<meta name="description" content="A Listless checklist. AI agents: instructions for reading and updating a list are at /">
 <title>Listless</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f6f5e'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11.5' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>{{STYLE}}</style>
 </head>
 <body>
+<noscript>
+	<p>Listless shows a checklist that lives in your browser, and it needs JavaScript. AI agent reading this page? The list is in the part of the address after “#”, which servers never see, and an address like /l/&lt;id&gt; has no list in it. To read a list, update it, or reply with an updated link, follow the instructions at <a href="/">/</a>.</p>
+</noscript>
 <header class="bar" hidden>
 	<div class="bar-inner">
 		<div class="heading">
@@ -57,7 +61,7 @@
 
 <main>
 	<p id="description" class="description" hidden></p>
-	<p id="notice" class="notice" hidden></p>
+	<p id="notice" class="notice" role="status" hidden></p>
 	<p id="announce" class="visually-hidden" aria-live="polite"></p>
 	<div id="list" hidden></div>
 	<button type="button" id="upcoming-hidden" class="upcoming-hidden" hidden></button>

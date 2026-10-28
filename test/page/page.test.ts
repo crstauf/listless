@@ -1,6 +1,7 @@
+import { inflateRawSync } from "node:zlib";
 import type { Page } from "playwright";
 import { describe, expect, it } from "vitest";
-import { ID_URL, ORIGIN, linkFor, useBrowser } from "./helpers.ts";
+import { ID_URL, ORIGIN, linkFor, plainLinkFor, useBrowser } from "./helpers.ts";
 
 const session = useBrowser();
 
@@ -8,6 +9,15 @@ const input = (page: Page, index: number) => page.locator("#list input[type=chec
 const toggle = (page: Page, index: number) => page.locator("#list .task .box").nth(index).click();
 const texts = (page: Page) => page.locator("#list .text").allTextContents();
 const checks = (page: Page) => page.locator("#list input[type=checkbox]").evaluateAll((boxes) => boxes.map((box) => (box as HTMLInputElement).checked));
+
+const shareLink = async (page: Page) => {
+	await page.locator("#share").click();
+	await page.locator("#share.flash").waitFor(); // building the link is asynchronous
+	return page.evaluate(() => navigator.clipboard.readText());
+};
+// The Markdown the Copy as Markdown button copies, without the note for agents after it.
+const listMarkdown = (markdown: string) => markdown.split("\n\n---\n")[0] + "\n";
+const decodeLink = (url: string) => JSON.parse(inflateRawSync(Buffer.from(url.split("#v1.")[1], "base64url")).toString());
 
 const groceries = { title: "Groceries", tasks: ["Milk", "Eggs", "Bread"] };
 const steps = { title: "Steps", ordered: true, tasks: ["One", "Two", "Three"] };
@@ -155,7 +165,8 @@ describe("ordered sections", () => {
 		const page = await open(linkFor(setup));
 		await page.locator("#copy").click();
 		await page.locator("#copy.flash").waitFor();
-		const markdown = await page.evaluate(() => navigator.clipboard.readText());
+		const copied = await page.evaluate(() => navigator.clipboard.readText());
+		const markdown = listMarkdown(copied);
 		expect(markdown).toBe("# Setup\n\n## Gather\n\n- [ ] Key\n- [ ] Token\n\n## Install\n\n1. [ ] Clone\n2. [ ] Build\n3. [ ] Test\n");
 
 		await page.locator("#share").click();
@@ -291,6 +302,17 @@ describe("link check marks", () => {
 		expect(await second.locator("#notice").isHidden()).toBe(true);
 	});
 
+	it("adds a link's check marks to the saved ones instead of replacing them", async () => {
+		const { open } = await session();
+		const first = await open(linkFor(groceries));
+		await first.waitForURL(ID_URL);
+		await toggle(first, 1);
+		const second = await open(linkFor(withMark));
+		await second.waitForURL(ID_URL);
+		await second.locator("#notice button").click();
+		expect(await checks(second)).toEqual([true, true, false]);
+	});
+
 	it("drops the offer when another link is pasted into the same tab", async () => {
 		const { open } = await session();
 		const first = await open(linkFor(groceries));
@@ -304,6 +326,143 @@ describe("link check marks", () => {
 		await expect.poll(() => page.locator("#title").textContent()).toBe("Other");
 		expect(await page.locator("#notice").isHidden()).toBe(true);
 		expect(await page.locator("#notice button").count()).toBe(0);
+	});
+});
+
+describe("links with an id", () => {
+	it("is what a share link carries, so it names the list it came from", async () => {
+		const { open } = await session();
+		const page = await open(linkFor(groceries));
+		await page.waitForURL(ID_URL);
+		expect(decodeLink(await shareLink(page)).id).toBe(page.url().split("/").pop());
+	});
+
+	it("opens the same list when an agent has edited it, and takes the edit only when asked", async () => {
+		const { open } = await session();
+		const first = await open(linkFor(groceries));
+		await first.waitForURL(ID_URL);
+		const shared = decodeLink(await shareLink(first));
+		await toggle(first, 1); // checked after the link was shared
+
+		// The agent marked Milk done and reworded the last task.
+		const edited = { ...shared, tasks: [{ text: "Milk", done: true }, "Eggs", "Rye bread"] };
+		const second = await open(linkFor(edited));
+		await second.waitForURL(ID_URL);
+		expect(second.url()).toBe(first.url());
+		expect(await second.locator("#notice").textContent()).toContain("different version");
+		expect(await texts(second)).toEqual(["Milk", "Eggs", "Bread"]);
+		expect(await checks(second)).toEqual([false, true, false]);
+
+		await second.locator("#notice button").click();
+		expect(await texts(second)).toEqual(["Milk", "Eggs", "Rye bread"]);
+		expect(await checks(second)).toEqual([true, true, false]); // Eggs is still checked
+		expect(await second.locator("#notice").isHidden()).toBe(true);
+
+		await second.locator("#toast-undo").click();
+		expect(await texts(second)).toEqual(["Milk", "Eggs", "Bread"]);
+		expect(await checks(second)).toEqual([false, true, false]);
+	});
+
+	it("only offers check marks when the tasks are the same, whatever order they are in", async () => {
+		const { open } = await session();
+		const first = await open(linkFor(groceries));
+		await first.waitForURL(ID_URL);
+		await first.locator(".handle").nth(0).focus();
+		await first.keyboard.press("ArrowDown");
+		expect(await texts(first)).toEqual(["Eggs", "Milk", "Bread"]);
+
+		const id = first.url().split("/").pop();
+		const second = await open(linkFor({ ...groceries, id, tasks: [{ text: "Milk", done: true }, "Eggs", "Bread"] }));
+		await second.waitForURL(ID_URL);
+		expect(second.url()).toBe(first.url());
+		expect(await second.locator("#notice").textContent()).toContain("check marks your saved copy doesn't");
+		await second.locator("#notice button").click();
+		expect(await texts(second)).toEqual(["Eggs", "Milk", "Bread"]); // still in the saved order
+		expect(await checks(second)).toEqual([false, true, false]);
+	});
+
+	it("opens a reordered share link as the same list, with nothing to offer", async () => {
+		const { open } = await session();
+		const first = await open(linkFor(groceries));
+		await first.waitForURL(ID_URL);
+		await first.locator(".handle").nth(0).focus();
+		await first.keyboard.press("ArrowDown");
+		const second = await open(await shareLink(first));
+		await second.waitForURL(ID_URL);
+		expect(second.url()).toBe(first.url());
+		expect(await second.locator("#notice").isHidden()).toBe(true);
+	});
+
+	it("opens a list this browser doesn't have under the link's id", async () => {
+		const { open } = await session();
+		const page = await open(linkFor({ ...groceries, id: "AAAAAAAAAAAA" }));
+		await page.waitForURL(`${ORIGIN}/l/AAAAAAAAAAAA`);
+		expect(await texts(page)).toEqual(["Milk", "Eggs", "Bread"]);
+		expect(await page.locator("#notice").isHidden()).toBe(true);
+	});
+
+	it("ignores an id that isn't one", async () => {
+		const { open } = await session();
+		const plain = await open(linkFor(groceries));
+		await plain.waitForURL(ID_URL);
+		for (const id of ["short", "AAAAAAAAAAAA/", 5]) {
+			const page = await open(linkFor({ ...groceries, id }));
+			await page.waitForURL(ID_URL);
+			expect(page.url()).toBe(plain.url());
+		}
+	});
+});
+
+describe("plain links", () => {
+	it("open like a compressed link, as the same list", async () => {
+		const { open } = await session();
+		const plain = await open(plainLinkFor(groceries));
+		await plain.waitForURL(ID_URL);
+		expect(await texts(plain)).toEqual(["Milk", "Eggs", "Bread"]);
+		const compressed = await open(linkFor(groceries));
+		await compressed.waitForURL(ID_URL);
+		expect(compressed.url()).toBe(plain.url());
+	});
+
+	it("take a hand-written % literally, and carry an id and done tasks", async () => {
+		const { open } = await session();
+		const page = await open(`${ORIGIN}/l/#json={"id":"AAAAAAAAAAAA","title":"Sale","tasks":[{"text":"50% off","done":true},"Pay"]}`);
+		await page.waitForURL(`${ORIGIN}/l/AAAAAAAAAAAA`);
+		expect(await texts(page)).toEqual(["50% off", "Pay"]);
+		expect(await checks(page)).toEqual([true, false]);
+	});
+
+	it("say so when the JSON is broken", async () => {
+		const { open } = await session();
+		const page = await open(`${ORIGIN}/l/#json=%7B%22tasks%22%3A`);
+		expect(await page.locator("#message-title").textContent()).toBe("This link is damaged");
+	});
+});
+
+describe("the note for agents in copied Markdown", () => {
+	it("says how to answer, names the list, and ends with a share link that opens it", async () => {
+		const first = await session();
+		const page = await first.open(linkFor(groceries));
+		await page.waitForURL(ID_URL);
+		await toggle(page, 0);
+		const id = page.url().split("/").pop();
+		await page.locator("#copy").click();
+		await page.locator("#copy.flash").waitFor();
+		const copied = await page.evaluate(() => navigator.clipboard.readText());
+
+		expect(listMarkdown(copied)).toBe("# Groceries\n\n- [x] Milk\n- [ ] Eggs\n- [ ] Bread\n");
+		const footer = copied.split("\n\n---\n")[1];
+		expect(footer).toContain("reply with an updated link");
+		expect(footer).toContain(`"id": "${id}"`);
+		expect(footer).toContain(`${ORIGIN}/l/#json=`);
+		expect(footer).toContain(`${ORIGIN}/\n`);
+
+		// The last line is the exact list, so a code-running agent can edit it and hand it back.
+		const link = copied.trimEnd().split("\n").pop()!;
+		expect(decodeLink(link)).toMatchObject({ id, tasks: [{ text: "Milk", done: true }, "Eggs", "Bread"] });
+		const other = await (await session()).open(link);
+		await other.waitForURL(ID_URL);
+		expect(await checks(other)).toEqual([true, false, false]);
 	});
 });
 
@@ -550,7 +709,8 @@ describe("copying as Markdown", () => {
 		);
 		await page.locator("#copy").click();
 		await page.locator("#copy.flash").waitFor();
-		const markdown = await page.evaluate(() => navigator.clipboard.readText());
+		const copied = await page.evaluate(() => navigator.clipboard.readText());
+		const markdown = listMarkdown(copied);
 		expect(markdown).toBe(
 			["# Trip", "", "Plan", "", "## Pack", "", "- [ ] Passport", "- [x] Charger", "  USB-C", "- [ ] Email Dana", "  `dana@example.com`"].join("\n") + "\n",
 		);
@@ -566,7 +726,8 @@ describe("copying as Markdown", () => {
 		);
 		await page.locator("#copy").click();
 		await page.locator("#copy.flash").waitFor();
-		const markdown = await page.evaluate(() => navigator.clipboard.readText());
+		const copied = await page.evaluate(() => navigator.clipboard.readText());
+		const markdown = listMarkdown(copied);
 		expect(markdown).toBe(["# DNS", "", "- [ ] Add the record", "  Name: `_acme`", "  `abc123`"].join("\n") + "\n");
 	});
 
@@ -576,7 +737,8 @@ describe("copying as Markdown", () => {
 		await toggle(page, 0);
 		await page.locator("#copy").click();
 		await page.locator("#copy.flash").waitFor();
-		const markdown = await page.evaluate(() => navigator.clipboard.readText());
+		const copied = await page.evaluate(() => navigator.clipboard.readText());
+		const markdown = listMarkdown(copied);
 		expect(markdown).toBe(["# Steps", "", "1. [x] One", "2. [ ] Two", "3. [ ] Three"].join("\n") + "\n");
 	});
 });

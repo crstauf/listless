@@ -105,6 +105,20 @@ describe("POST /api/lists", () => {
 		});
 	});
 
+	it("keeps an id, which names the list a link updates", async () => {
+		const { res, data } = await createLink({ id: "abcDEF123-_x", tasks: ["One"] });
+		expect(res.status).toBe(201);
+		expect(await decodeList(data.url!.split("#")[1])).toEqual({ v: 1, id: "abcDEF123-_x", tasks: ["One"] });
+	});
+
+	it("rejects an id that is not 12 characters of letters, digits, - and _", async () => {
+		for (const id of ["short", "abcDEF123-_xy", "abcDEF123 _x", "abcDEF123/_x", 123456789012, null]) {
+			const { res, data } = await createLink({ id, tasks: ["One"] });
+			expect(res.status, String(id)).toBe(400);
+			expect(data.error).toContain('"id"');
+		}
+	});
+
 	it("omits ordered when false and blank details", async () => {
 		const { data } = await createLink({ ordered: false, tasks: [{ text: "One", details: "  " }] });
 		expect(await decodeList(data.url!.split("#")[1])).toEqual({ v: 1, tasks: ["One"] });
@@ -235,6 +249,18 @@ describe("GET /", () => {
 		expect(text).toContain("the sections are done in order");
 		expect(text).toContain('A section can also be "ordered": true');
 		expect(text).toContain('{"title": "Install", "ordered": true,');
+	});
+});
+
+describe("GET / for updating a list", () => {
+	it("explains reading a share link and answering with an updated one, with or without code", async () => {
+		const text = await (await get("/")).text();
+		expect(text).toContain("## Updating a list the user gave you");
+		expect(text).toContain('Keep "id" exactly as it is.');
+		expect(text).toContain("Always give the user the updated link");
+		// Decoding needs code; writing a link by hand doesn't.
+		expect(text).toContain("inflateRawSync");
+		expect(text).toContain(`${ORIGIN}/l/#json=%7B%22title%22`);
 	});
 });
 
