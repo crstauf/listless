@@ -36,7 +36,9 @@ and the JSON is a list (see "List format" below), for example:
 
 The list sits after "#", which browsers never send to a server. When the page
 opens, it saves the list in the browser and shortens the address to
-${origin}/l/<id>.
+${origin}/l/<id>. The id comes from the list's contents, so opening the same
+link again finds the same list; a link can also name the list it updates (see
+"Updating a list the user gave you").
 
 ### Option 1 (preferred): build the link yourself
 
@@ -66,16 +68,71 @@ Response (201):
 
 Errors return 400 (or 413 for an oversized body) with {"error": "..."}.
 
+### Option 3: write the link by hand
+
+For agents that can't run code or make requests. Write the list as JSON,
+URL-encode it as encodeURIComponent would (a space is %20, " is %22, { is %7B,
+} is %7D, : is %3A, "," is %2C, [ is %5B, ] is %5D, and "%" itself is %25), and
+put it after "#json=":
+
+    ${origin}/l/#json=%7B%22title%22%3A%22Groceries%22%2C%22tasks%22%3A%5B%22Milk%22%2C%22Eggs%22%5D%7D
+
+The page treats it exactly like a compressed link, including the ids below.
+It is longer, so prefer Option 1 or 2 when you can.
+
+## Updating a list the user gave you
+
+${origin}/l/<id> has no list in it: the list lives in the user's browser, which
+you can't read, so fetching that address shows you nothing. To work from a
+list, ask the user for a share link instead: the "Copy share link" button
+gives ${origin}/l/#v1.<data>, with the list as it is now, including its order
+and check marks.
+
+The user may instead paste the list as Markdown (their "Copy as Markdown"
+button). It ends with a note about Listless, the list's id, and the same kind
+of share link, so you can use either.
+
+To report progress or change the list, decode the link (or read the Markdown),
+edit the JSON, and encode it again with the commands in "Making a link". If
+you can't run code, write the whole list as JSON, with the "id" from the
+note, and build the link by hand (Option 3).
+
+Python:
+
+    echo '<the link>' | python3 -c 'import base64,json,sys,zlib; d=sys.stdin.read().strip().split("#v1.")[1]; print(json.dumps(json.loads(zlib.decompress(base64.urlsafe_b64decode(d+"="*(-len(d)%4)),-15))))'
+
+Node.js:
+
+    echo '<the link>' | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(require("zlib").inflateRawSync(Buffer.from(s.trim().split("#v1.")[1],"base64url")).toString()))'
+
+- Keep "id" exactly as it is. It names the list in the user's browser that the
+  link updates. Never make one up; a link without it is an ordinary new link.
+- Add "done": true to a task you finished (the same ordering rules apply: in
+  an ordered list or section, done tasks come first), or edit the list.
+- Always give the user the updated link when you report progress, as in
+  "Giving the link to the user". POST keeps "id" too.
+
+When the user opens it, they land on their existing list and nothing changes
+until they say so. If only check marks differ, the page offers to add the
+link's check marks to theirs. If the content differs, it offers to use the
+new version; their own check marks on tasks it still has are kept, and they
+can undo. If the link has no "id" (or you removed it), it opens the same list
+only when the content is unchanged, and otherwise becomes a separate list.
+
 ## List format
 
     {
       "v": 1,
+      "id": "Optional, only from a share link: keep it as it is",
       "title": "Optional title",
       "description": "Optional context, e.g. a link back to this conversation",
       "ordered": false,
       "tasks": [ <task>, <task>, ... ]
     }
 
+- id: optional, 12 characters (letters, digits, "-" and "_"). Only a share
+  link has one; leave it out of a new list, and keep it when updating one.
+  It is not part of the list's content.
 - title: optional.
 - description: optional. Shown under the title, with line breaks kept. When
   you know the address of the conversation the list came from, put it here
@@ -176,7 +233,8 @@ click.
 ## Giving the link to the user
 
 The link can be long. Show it as a Markdown link, for example
-[Open checklist](<url>), or open it for them (macOS: open "<url>").
+[Open checklist](<url>), or open it for them (macOS: open "<url>"). A link
+you updated goes back to the user the same way.
 
 ## Network traffic, exactly
 
@@ -185,7 +243,8 @@ The link can be long. Show it as a Markdown link, for example
 - POST: one request carrying the tasks; the response is the link. Nothing is
   stored or logged.
 - Reopening ${origin}/l/<id>: one GET for the page. The id is a hash of the
-  list, and the list itself stays in the browser.
+  list's contents (or the "id" in the link, when it has one), and the list
+  itself stays in the browser.
 - A link in the list goes to its own site only when the user clicks it. It
   opens in a new tab and sends no referrer, so that site doesn't learn which
   list it came from.

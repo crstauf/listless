@@ -14,6 +14,11 @@
 	--on-accent: #ffffff;
 	--danger: #b03c2e;
 	--danger-soft: #f8e6e2;
+	--notice: #e0a800;
+	--notice-strong: #9a6400;
+	--notice-hover: #7f5200;
+	--notice-soft: #fdf1c8;
+	--on-notice: #ffffff;
 	--code-bg: #eef0eb;
 	--drawer-bg: #eceee8;
 	--shadow: 0 1px 2px rgb(31 35 33 / 0.05), 0 2px 8px rgb(31 35 33 / 0.04);
@@ -37,6 +42,11 @@
 		--on-accent: #0f2a22;
 		--danger: #f0907f;
 		--danger-soft: #3a211d;
+		--notice: #f0c35a;
+		--notice-strong: #f0c35a;
+		--notice-hover: #f7d27a;
+		--notice-soft: #3a2f12;
+		--on-notice: #2a2008;
 		--code-bg: #292929;
 		--drawer-bg: #0f0f0f;
 		--shadow: 0 1px 2px rgb(0 0 0 / 0.3);
@@ -69,6 +79,12 @@ body {
 
 [hidden] {
 	display: none !important;
+}
+
+noscript p {
+	max-width: 40rem;
+	margin: 1rem auto;
+	padding: 0 1rem;
 }
 
 .visually-hidden {
@@ -856,19 +872,67 @@ h1 code {
 
 /* ---- states ---------------------------------------------------------------- */
 
+/* Something the reader needs to act on or know, so it stands out from the list:
+   tinted amber, with a bar and icon, and it settles in with a brief ring. */
 .notice {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 12px;
 	margin: 0 0 16px;
-	padding: 12px 16px;
-	border: 1px solid var(--border);
+	padding: 14px 16px;
+	border: 1px solid var(--notice);
+	border-left-width: 6px;
 	border-radius: var(--radius);
-	background: var(--surface);
-	color: var(--muted);
-	font-size: 0.9375rem;
+	background: var(--notice-soft);
+	color: var(--text);
+	font-size: 1rem;
+	font-weight: 500;
+	animation: notice-in 500ms ease-out, notice-ring 1.4s ease-out 300ms;
+}
+
+.notice::before {
+	content: "!";
+	flex: none;
+	display: grid;
+	place-items: center;
+	width: 24px;
+	height: 24px;
+	border-radius: 50%;
+	background: var(--notice-strong);
+	color: var(--on-notice);
+	font-size: 0.875rem;
+	font-weight: 700;
 }
 
 .notice button {
-	margin-left: 4px;
-	padding: 4px 12px;
+	margin-left: auto;
+	padding: 6px 16px;
+	border-color: var(--notice-strong);
+	background: var(--notice-strong);
+	color: var(--on-notice);
+	font-weight: 600;
+}
+
+.notice button:hover {
+	border-color: var(--notice-hover);
+	background: var(--notice-hover);
+}
+
+@keyframes notice-in {
+	from {
+		opacity: 0;
+		transform: translateY(-6px);
+	}
+}
+
+@keyframes notice-ring {
+	from {
+		box-shadow: 0 0 0 0 var(--notice);
+	}
+	to {
+		box-shadow: 0 0 0 10px transparent;
+	}
 }
 
 /* ---- reordering ------------------------------------------------------------ */

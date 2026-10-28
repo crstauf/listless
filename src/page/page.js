@@ -7,7 +7,10 @@
 (() => {
 	const STORAGE_PREFIX = "listless:";
 	const FORMAT_PREFIX = "#v1.";
+	// The same list as plain JSON, percent-encoded, for agents that can't run code to compress it.
+	const PLAIN_PREFIX = "#json=";
 	const ID_LENGTH = 12;
+	const ID_PATTERN = new RegExp(`^[A-Za-z0-9_-]{${ID_LENGTH}}$`);
 	// Filled in at build time from src/limits.ts.
 	const LIMITS = "{{LIMITS}}";
 
@@ -306,11 +309,33 @@
 		return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 	}
 
+	function isLinkHash(hash) {
+		return hash.startsWith(FORMAT_PREFIX) || hash.startsWith(PLAIN_PREFIX);
+	}
+
+	// The list, plus `linkId` when the link names the saved list it updates (a
+	// share link does). Like `done`, that's not content, so a malformed one is
+	// ignored and the list's own id applies.
 	async function decodeFragment(fragment) {
-		const compressed = fromBase64Url(fragment.slice(FORMAT_PREFIX.length));
-		const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
-		const text = await new Response(stream).text();
-		return normalizeList(JSON.parse(text));
+		let text;
+		if (fragment.startsWith(PLAIN_PREFIX)) {
+			// Written by hand, so a "%" that doesn't start an escape is taken literally
+			// rather than rejected.
+			const raw = fragment.slice(PLAIN_PREFIX.length);
+			try {
+				text = decodeURIComponent(raw.replace(/%(?![0-9A-Fa-f]{2})/g, "%25"));
+			} catch {
+				text = raw;
+			}
+		} else {
+			const compressed = fromBase64Url(fragment.slice(FORMAT_PREFIX.length));
+			const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+			text = await new Response(stream).text();
+		}
+		const value = JSON.parse(text);
+		const list = normalizeList(value);
+		if (!list) return null;
+		return typeof value.id === "string" && ID_PATTERN.test(value.id) ? { ...list, linkId: value.id } : list;
 	}
 
 	async function encodeFragment(value) {
@@ -319,8 +344,11 @@
 		return FORMAT_PREFIX + toBase64Url(new Uint8Array(await new Response(stream).arrayBuffer()));
 	}
 
-	// The ID is derived from the list's content, so reopening the same link
-	// finds the same saved list (and its checks) instead of creating a copy.
+	// A list's ID is derived from its content, so reopening the same link finds
+	// the same saved list (and its checks) instead of creating a copy. It is the
+	// ID only when the link doesn't name one: a link with an `id` (a share link)
+	// opens that saved list whatever its content. Once a list is saved its ID is
+	// fixed, even if its content later changes.
 	// (A list without a description hashes as it did before descriptions existed.)
 	async function listId(list) {
 		const { title, description, ordered, sections } = list;
@@ -1104,13 +1132,29 @@
 		showToast("List deleted", restore);
 	});
 
+	// What goes after the Markdown, so an agent that is handed it knows what this
+	// is and how to answer with an updated list. The share link is the exact list,
+	// for agents that can run code; the rest is for ones that can't.
+	async function agentFooter() {
+		const fragment = await encodeFragment(toLinkJson());
+		const base = location.origin;
+		return [
+			"",
+			"---",
+			`Listless list. To report progress, reply with an updated link: edit the list in the link below ("done": true on finished tasks, keep "id": "${id}"), or, if you can't run code, write ${base}/l/${PLAIN_PREFIX} followed by the list as URL-encoded JSON, including that id. Instructions: ${base}/`,
+			`${base}/l/${fragment}`,
+			"",
+		].join("\n");
+	}
+
 	els.copy.addEventListener("click", async () => {
-		const ok = await copyText(toMarkdown());
+		const ok = await copyText(toMarkdown() + (await agentFooter()));
 		flash(els.copy, ok ? "Copied" : "Copy failed");
 	});
 
 	// The list as it is now, in link format: current order and check marks, but
-	// not view settings.
+	// not view settings. It names this list's id, so a link an agent edits and
+	// hands back updates this list instead of becoming a new one.
 	function toLinkJson() {
 		const checked = new Set(state.checked);
 		let index = 0;
@@ -1127,7 +1171,7 @@
 			});
 			return { ...(section.title ? { title: section.title } : {}), ...(section.ordered ? { ordered: true } : {}), tasks };
 		});
-		const body = { v: 1 };
+		const body = { v: 1, id };
 		if (state.title) body.title = state.title;
 		if (state.description) body.description = state.description;
 		if (isSingleGroup(state)) {
@@ -1339,18 +1383,38 @@
 
 	// ---- startup ---------------------------------------------------------------
 
+	// Tasks are matched by their content, since the saved copy may have been
+	// reordered.
+	function taskKey(task) {
+		return task.text + "\0" + task.details + "\0" + JSON.stringify(task.copy || "");
+	}
+
+	// Whether two lists say the same thing. Tasks that can be reordered may be in
+	// a different order; the steps of an ordered section may not.
+	function sameContent(a, b) {
+		const shape = (list) =>
+			JSON.stringify([
+				list.title,
+				list.description,
+				list.ordered,
+				list.sections.map((section) => {
+					const keys = section.tasks.map(taskKey);
+					return [section.title, section.ordered === true, tasksOrdered(list, section) ? keys : keys.sort()];
+				}),
+			]);
+		return shape(a) === shape(b);
+	}
+
 	// The saved copy wins when a link opens a list this browser already has. If
-	// the link marks tasks done that the saved copy hasn't checked, offer them.
-	// Tasks are matched by section and content, since the saved copy may have
-	// been reordered.
+	// the link marks tasks done that the saved copy hasn't checked, offer them,
+	// on top of the ones it has. Tasks are matched by section and content.
 	function offerLinkChecks(list) {
-		const key = (task) => task.text + "\0" + task.details + "\0" + JSON.stringify(task.copy || "");
 		const pending = state.sections.map((section) => {
 			const queues = new Map();
 			return { section, queues, add: (k, i) => queues.set(k, [...(queues.get(k) || []), i]) };
 		});
 		let index = 0;
-		pending.forEach(({ section, add }) => section.tasks.forEach((task) => add(key(task), index++)));
+		pending.forEach(({ section, add }) => section.tasks.forEach((task) => add(taskKey(task), index++)));
 
 		let linkIndex = 0;
 		const wanted = new Set(list.initialChecked);
@@ -1358,7 +1422,7 @@
 		list.sections.forEach((section, s) => {
 			for (const task of section.tasks) {
 				if (wanted.has(linkIndex++)) {
-					const match = pending[s]?.queues.get(key(task))?.shift();
+					const match = pending[s]?.queues.get(taskKey(task))?.shift();
 					if (match !== undefined) mapped.push(match);
 				}
 			}
@@ -1371,9 +1435,56 @@
 		showNotice("This link has check marks your saved copy doesn't.", {
 			label: "Use the link's check marks",
 			run: () => {
-				state.checked = mapped;
+				state.checked = validChecks(state, [...new Set([...state.checked, ...mapped])].sort((a, b) => a - b));
 				save();
 				update();
+			},
+		});
+	}
+
+	// A link that names a list this browser has, but says something different: an
+	// agent edited a share link and handed it back. As with check marks, the saved
+	// copy stays as it is until the user takes the new version. It brings the
+	// link's check marks, and keeps the user's on tasks it still has.
+	function offerLinkVersion(list) {
+		if (sameContent(state, list)) return offerLinkChecks(list);
+
+		showNotice("This link has a different version of this list.", {
+			label: "Use this version",
+			run: () => {
+				const queues = new Map();
+				let index = 0;
+				for (const section of list.sections) {
+					for (const task of section.tasks) {
+						const key = taskKey(task);
+						queues.set(key, [...(queues.get(key) || []), index++]);
+					}
+				}
+				const have = new Set(state.checked);
+				const kept = [];
+				index = 0;
+				for (const section of state.sections) {
+					for (const task of section.tasks) {
+						if (!have.has(index++)) continue;
+						const match = queues.get(taskKey(task))?.shift();
+						if (match !== undefined) kept.push(match);
+					}
+				}
+				const next = {
+					title: list.title,
+					description: list.description,
+					ordered: list.ordered,
+					sections: list.sections,
+					checked: validChecks(list, [...new Set([...kept, ...list.initialChecked])].sort((a, b) => a - b)),
+					collapsed: state.collapsed.filter((i) => list.sections[i]?.title && list.sections[i].title === state.sections[i]?.title),
+				};
+				const before = Object.fromEntries(Object.keys(next).map((name) => [name, state[name]]));
+				const apply = (values) => {
+					Object.assign(state, values);
+					save();
+					render();
+				};
+				undoable("Updated this list from the link", () => apply(next), () => apply(before));
 			},
 		});
 	}
@@ -1387,19 +1498,20 @@
 		clearToast();
 		persistent = storageAvailable();
 
-		if (location.hash.startsWith(FORMAT_PREFIX)) {
-			let list;
+		if (isLinkHash(location.hash)) {
+			let decoded;
 			try {
-				list = await decodeFragment(location.hash);
+				decoded = await decodeFragment(location.hash);
 			} catch {
-				list = null;
+				decoded = null;
 			}
-			if (!list) {
+			if (!decoded) {
 				showMessage("This link is damaged", "The list in this link couldn't be read. It may have been cut off when it was copied. Ask the agent for the link again.");
 				return;
 			}
 
-			id = await listId(list);
+			const { linkId, ...list } = decoded;
+			id = linkId || (await listId(list));
 			const saved = persistent ? load(id) : null;
 			state = saved || freshState(list);
 
@@ -1411,7 +1523,7 @@
 				showNotice("Your browser isn't letting this page save. Keep the original link; checks will be lost when you close it.");
 			}
 			render();
-			if (saved) offerLinkChecks(list);
+			if (saved) (linkId ? offerLinkVersion : offerLinkChecks)(list);
 			return;
 		}
 
@@ -1434,7 +1546,7 @@
 	// A new link pasted into this tab only changes the fragment, which doesn't
 	// reload the page.
 	window.addEventListener("hashchange", () => {
-		if (location.hash.startsWith(FORMAT_PREFIX)) start();
+		if (isLinkHash(location.hash)) start();
 	});
 
 	start();

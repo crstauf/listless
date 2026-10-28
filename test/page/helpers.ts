@@ -12,6 +12,10 @@ export function linkFor(list: Record<string, unknown>): string {
 	return `${ORIGIN}/l/#v1.${deflateRawSync(JSON.stringify({ v: 1, ...list })).toString("base64url")}`;
 }
 
+export function plainLinkFor(list: Record<string, unknown>): string {
+	return `${ORIGIN}/l/#json=${encodeURIComponent(JSON.stringify({ v: 1, ...list }))}`;
+}
+
 export const ID_URL = /\/l\/[A-Za-z0-9_-]{12}$/;
 
 export interface Session {

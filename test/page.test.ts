@@ -36,6 +36,15 @@ describe("checklist page", () => {
 	});
 });
 
+describe("checklist page for agents", () => {
+	it("points an agent that fetches it to the instructions", () => {
+		expect(PAGE_HTML).toMatch(/<meta name="description" content="[^"]*AI agents[^"]*">/);
+		const noscript = between(PAGE_HTML, "<noscript>", "</noscript>")[0];
+		expect(noscript).toContain("AI agent");
+		expect(noscript).toContain('<a href="/">');
+	});
+});
+
 describe("Content-Security-Policy", () => {
 	const directives = new Map(
 		PAGE_CSP.split(";").map((d) => {

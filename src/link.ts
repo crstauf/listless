@@ -8,6 +8,10 @@ export { LIMITS };
 
 export const FORMAT_PREFIX = "v1.";
 
+// The shape of a list id: the first 12 characters of a base64url hash, which the
+// page computes (ID_LENGTH in src/page/page.js).
+const ID_PATTERN = /^[A-Za-z0-9_-]{12}$/;
+
 // A task is plain text, or text plus muted details. Backtick spans in any text
 // are shown as code on the page; nothing else is interpreted. `copy` is one or
 // more values the user will paste elsewhere, shown literally with a copy button
@@ -25,6 +29,10 @@ export interface Section {
 
 export type List = {
 	v: 1;
+	// The id of the list this link updates. Share links carry it, so a link that
+	// an agent edited and handed back opens the list the user already has instead
+	// of a new one. It isn't content: it never changes what a list's id hashes.
+	id?: string;
 	title?: string;
 	// Shown under the title. Web addresses in it become links, so it's the
 	// place for a link back to the conversation the list came from.
@@ -47,8 +55,11 @@ export function parseList(input: unknown): ParseResult {
 
 function toList(input: unknown): List {
 	if (!isObject(input)) throw new InvalidList("Body must be a JSON object.");
-	const { title, description, ordered, tasks, sections } = input;
+	const { id, title, description, ordered, tasks, sections } = input;
 
+	if (id !== undefined && (typeof id !== "string" || !ID_PATTERN.test(id))) {
+		throw new InvalidList('"id" must be a 12-character id (letters, digits, "-" and "_") when present.');
+	}
 	const cleanTitle = optionalText(title, "title", LIMITS.maxTitleLength);
 	const cleanDescription = optionalText(description, "description", LIMITS.maxDescriptionLength);
 	if (ordered !== undefined && typeof ordered !== "boolean") {
@@ -60,6 +71,7 @@ function toList(input: unknown): List {
 
 	const head = {
 		v: 1 as const,
+		...(id ? { id } : {}),
 		...(cleanTitle ? { title: cleanTitle } : {}),
 		...(cleanDescription ? { description: cleanDescription } : {}),
 		...(ordered ? { ordered: true as const } : {}),
