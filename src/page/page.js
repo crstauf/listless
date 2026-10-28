@@ -1224,8 +1224,11 @@
 		if (!handle || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
 		event.preventDefault();
 		const { sectionIndex, view, from } = rowPosition(handle);
-		const to = from + (event.key === "ArrowUp" ? -1 : 1);
-		if (to < 0 || to >= view.rows.length) return;
+		// Step to the nearest row that's showing, so a hidden one isn't moved past unseen.
+		const step = event.key === "ArrowUp" ? -1 : 1;
+		let to = from + step;
+		while (view.rows[to]?.li.hidden) to += step;
+		if (!view.rows[to]) return;
 		moveTask(sectionIndex, from, to);
 	});
 

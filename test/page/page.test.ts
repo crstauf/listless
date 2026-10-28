@@ -264,6 +264,17 @@ describe("reordering", () => {
 		expect(await texts(page)).toEqual(["Eggs", "Milk", "Bread"]);
 		expect(await checks(page)).toEqual([false, true, false]);
 	});
+
+	it("skips tasks that are hidden, so a key press always moves something you can see", async () => {
+		const { open } = await session();
+		const page = await open(linkFor(groceries));
+		await toggle(page, 1);
+		await page.locator("#toggle-done").click(); // hides Eggs
+		await page.locator(".handle").nth(2).focus();
+		await page.keyboard.press("ArrowUp");
+		expect(await texts(page)).toEqual(["Bread", "Milk", "Eggs"]);
+		expect(await checks(page)).toEqual([false, false, true]);
+	});
 });
 
 describe("share links", () => {

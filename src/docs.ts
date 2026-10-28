@@ -77,7 +77,8 @@ put it after "#json=":
 
     ${origin}/l/#json=%7B%22title%22%3A%22Groceries%22%2C%22tasks%22%3A%5B%22Milk%22%2C%22Eggs%22%5D%7D
 
-The page treats it exactly like a compressed link, including the ids below.
+The page treats it exactly like a compressed link, including "id" (see
+"Updating a list the user gave you").
 It is longer, so prefer Option 1 or 2 when you can.
 
 ## Updating a list the user gave you
@@ -85,8 +86,8 @@ It is longer, so prefer Option 1 or 2 when you can.
 ${origin}/l/<id> has no list in it: the list lives in the user's browser, which
 you can't read, so fetching that address shows you nothing. To work from a
 list, ask the user for a share link instead: the "Copy share link" button
-gives ${origin}/l/#v1.<data>, with the list as it is now, including its order
-and check marks.
+gives ${origin}/l/#v1.<data>, with the list as it is now, including its order,
+check marks and id.
 
 The user may instead paste the list as Markdown (their "Copy as Markdown"
 button). It ends with a note about Listless, the list's id, and the same kind
