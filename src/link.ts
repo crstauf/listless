@@ -22,6 +22,8 @@ export type Task = string | { text: string; details?: string; copy?: string | Co
 
 export interface Section {
 	title: string;
+	// Shown under the section's title, for context its tasks share.
+	description?: string;
 	// The tasks in this section are done in sequence.
 	ordered?: true;
 	tasks: Task[];
@@ -99,12 +101,18 @@ function toList(input: unknown): List {
 		const path = `sections[${i}]`;
 		if (!isObject(section)) throw new InvalidList(`${path} must be an object with "title" and "tasks".`);
 		const sectionTitle = requiredText(section.title, `${path}.title`, LIMITS.maxTitleLength);
+		const sectionDescription = optionalText(section.description, `${path}.description`, LIMITS.maxDescriptionLength);
 		if (section.ordered !== undefined && typeof section.ordered !== "boolean") {
 			throw new InvalidList(`"${path}.ordered" must be true or false when present.`);
 		}
 		const sectionTasks = taskList(section.tasks, `${path}.tasks`);
 		countTasks(sectionTasks.length);
-		return { title: sectionTitle, ...(section.ordered ? { ordered: true as const } : {}), tasks: sectionTasks };
+		return {
+			title: sectionTitle,
+			...(sectionDescription ? { description: sectionDescription } : {}),
+			...(section.ordered ? { ordered: true as const } : {}),
+			tasks: sectionTasks,
+		};
 	});
 	checkDoneSections(cleanedSections, ordered === true);
 	return { ...head, sections: cleanedSections };

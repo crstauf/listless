@@ -51,7 +51,7 @@
 
 	let id = null;
 	let persistent = true;
-	// state: { title, description, ordered, sections: [{ title, ordered?, tasks: [{ text, details, copy? }] }],
+	// state: { title, description, ordered, sections: [{ title, description?, ordered?, tasks: [{ text, details, copy? }] }],
 	//          checked: number[], hideCompleted, hideUpcoming, hideDetails, hideCopy,
 	//          collapsed: number[] (section indices, saved here only, never in a link), createdAt }
 	// Task numbers in `checked` count across all sections, in order.
@@ -116,7 +116,8 @@
 			sections = value.sections.map((section) => {
 				const tasks = section && normalizeTasks(section.tasks);
 				const title = section && typeof section.title === "string" ? clip(section.title, LIMITS.maxTitleLength) : "";
-				return tasks && { title, ...(section.ordered === true ? { ordered: true } : {}), tasks };
+				const description = section && typeof section.description === "string" ? clip(section.description, LIMITS.maxDescriptionLength) : "";
+				return tasks && { title, ...(description ? { description } : {}), ...(section.ordered === true ? { ordered: true } : {}), tasks };
 			});
 			if (sections.includes(null)) return null;
 		} else {
@@ -596,7 +597,16 @@
 			}
 			// The wrapper is what collapses; the list inside keeps its own layout.
 			const body = el("div", "group-body");
-			body.append(list);
+			if (section.description) {
+				// One grid row, so the collapse animation still has a single row to shrink.
+				const inner = el("div", "group-inner");
+				const description = el("p", "group-description");
+				renderInline(description, section.description, true);
+				inner.append(description, list);
+				body.append(inner);
+			} else {
+				body.append(list);
+			}
 			group.append(body);
 			return {
 				group,
@@ -1169,7 +1179,12 @@
 					...(done ? { done: true } : {}),
 				};
 			});
-			return { ...(section.title ? { title: section.title } : {}), ...(section.ordered ? { ordered: true } : {}), tasks };
+			return {
+				...(section.title ? { title: section.title } : {}),
+				...(section.description ? { description: section.description } : {}),
+				...(section.ordered ? { ordered: true } : {}),
+				tasks,
+			};
 		});
 		const body = { v: 1, id };
 		if (state.title) body.title = state.title;
@@ -1297,6 +1312,7 @@
 		for (const section of state.sections) {
 			lines.push("");
 			if (section.title) lines.push(`## ${oneLine(section.title)}`, "");
+			if (section.description) lines.push(...section.description.split("\n").map((line) => line.trim()), "");
 			const sequential = tasksOrdered(state, section);
 			section.tasks.forEach((task, k) => {
 				const marker = sequential ? `${k + 1}.` : "-";
@@ -1402,7 +1418,7 @@
 				list.ordered,
 				list.sections.map((section) => {
 					const keys = section.tasks.map(taskKey);
-					return [section.title, section.ordered === true, tasksOrdered(list, section) ? keys : keys.sort()];
+					return [section.title, section.description || "", section.ordered === true, tasksOrdered(list, section) ? keys : keys.sort()];
 				}),
 			]);
 		return shape(a) === shape(b);

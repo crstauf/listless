@@ -56,6 +56,24 @@ describe("POST /api/lists", () => {
 		});
 	});
 
+	it("keeps a trimmed section description, line breaks included, and omits a blank one", async () => {
+		const description = "Shared context\nSee https://example.com/guide";
+		const { res, data } = await createLink({
+			sections: [
+				{ title: "Gather", description: `  ${description} `, tasks: ["a"] },
+				{ title: "Install", description: "  ", tasks: ["b"] },
+			],
+		});
+		expect(res.status).toBe(201);
+		expect(await decodeList(data.url!.split("#")[1])).toEqual({
+			v: 1,
+			sections: [
+				{ title: "Gather", description, tasks: ["a"] },
+				{ title: "Install", tasks: ["b"] },
+			],
+		});
+	});
+
 	it("keeps ordered on a section, and drops it when false", async () => {
 		const { res, data } = await createLink({
 			sections: [
@@ -214,6 +232,8 @@ describe("POST /api/lists", () => {
 		["a copy label that is too long", JSON.stringify({ tasks: [{ text: "ok", copy: [{ label: "l".repeat(LIMITS.maxCopyLabelLength + 1), value: "c" }] }] })],
 		["a copy item value that is too long", JSON.stringify({ tasks: [{ text: "ok", copy: [{ value: "c".repeat(LIMITS.maxCopyLength + 1) }] }] })],
 		["a copy value that is too long", JSON.stringify({ tasks: [{ text: "ok", copy: "c".repeat(LIMITS.maxCopyLength + 1) }] })],
+		["a non-string section description", JSON.stringify({ sections: [{ title: "s", description: 5, tasks: ["ok"] }] })],
+		["a section description that is too long", JSON.stringify({ sections: [{ title: "s", description: "d".repeat(LIMITS.maxDescriptionLength + 1), tasks: ["ok"] }] })],
 		["a non-boolean ordered", JSON.stringify({ ordered: "yes", tasks: ["ok"] })],
 	])("rejects %s with 400", async (_, body) => {
 		const res = await post("/api/lists", body);
