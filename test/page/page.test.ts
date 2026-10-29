@@ -1119,3 +1119,41 @@ describe("a phone-sized screen", () => {
 		expect(del.x + del.width).toBeLessThanOrEqual(row.x + row.width);
 	});
 });
+
+// Everything above runs with animations off. These are the only tests that need
+// them on, and only for behaviour that depends on them: the pop a check mark plays,
+// and a folded section that must stay unreachable once its transition has finished.
+describe("with motion", () => {
+	const motion = { reducedMotion: "no-preference" } as const;
+	const playing = (page: Page, name: string) =>
+		page.locator("#list .box").first().evaluate((box, name) => box.getAnimations().some((a) => (a as CSSAnimation).animationName === name), name);
+
+	it("pops a box when it is checked, and not at all with reduced motion", async () => {
+		const { open } = await session(motion);
+		const page = await open(linkFor(groceries));
+		await page.waitForURL(ID_URL);
+		expect(await playing(page, "pop")).toBe(false);
+		await toggle(page, 0);
+		expect(await playing(page, "pop")).toBe(true);
+
+		const still = await (await session()).open(linkFor(groceries));
+		await still.waitForURL(ID_URL);
+		await toggle(still, 0);
+		expect(await playing(still, "pop")).toBe(false);
+	});
+
+	it("keeps a folded section out of reach once it has finished folding, and brings it back", async () => {
+		const { open } = await session(motion);
+		const page = await open(linkFor({ sections: [{ title: "Alpha", tasks: ["A1", "A2"] }, { title: "Beta", tasks: ["B1"] }] }));
+		await page.waitForURL(ID_URL);
+		await page.locator("#list .collapse").first().click();
+		await page.locator("#section-0-tasks").waitFor({ state: "hidden" });
+		await page.locator("#list .collapse").first().focus();
+		await page.keyboard.press("Tab");
+		expect(await page.evaluate(() => document.activeElement?.closest("#section-0-tasks") === null)).toBe(true);
+
+		await page.locator("#list .collapse").first().click();
+		await page.locator("#section-0-tasks").waitFor({ state: "visible" });
+		expect(await texts(page)).toEqual(["A1", "A2", "B1"]);
+	});
+});
