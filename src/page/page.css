@@ -521,9 +521,24 @@ main {
 	transition: grid-template-rows 250ms ease, margin 250ms ease, padding 250ms ease, visibility 0s;
 }
 
-.group-body > .tasks {
+.group-body > .tasks,
+.group-body > .group-inner {
 	min-height: 0;
 	pointer-events: auto;
+}
+
+.group-description {
+	margin: 0 0 12px;
+	padding: 0 2px;
+	color: var(--muted);
+	font-size: 0.9375rem;
+	line-height: 1.55;
+	white-space: pre-line;
+	overflow-wrap: anywhere;
+}
+
+.group-description a {
+	text-underline-offset: 2px;
 }
 
 .group.collapsed .group-body {

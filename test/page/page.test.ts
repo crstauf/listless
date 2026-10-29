@@ -708,6 +708,89 @@ describe("pages with no list", () => {
 	});
 });
 
+describe("section descriptions", () => {
+	const described = {
+		title: "Release",
+		sections: [
+			{ title: "Prepare", description: "Before the window opens.\nSee https://example.com/runbook.", tasks: ["Review", { text: "Bump", details: "Edit `package.json`." }] },
+			{ title: "Ship", tasks: ["Publish"] },
+		],
+	};
+
+	it("shows the description under its heading, with links, and folds it with the section", async () => {
+		const { open } = await session();
+		const page = await open(linkFor(described));
+		await page.waitForURL(ID_URL);
+		const description = page.locator("#list .group-description");
+		expect(await description.count()).toBe(1);
+		expect(await description.textContent()).toBe("Before the window opens.\nSee https://example.com/runbook.");
+		expect(await description.locator("a").getAttribute("href")).toBe("https://example.com/runbook");
+		await page.locator("#list .collapse").first().click();
+		await description.waitFor({ state: "hidden" });
+	});
+
+	it("isn't hidden by Hide details", async () => {
+		const { open } = await session();
+		const page = await open(linkFor(described));
+		await page.locator("#toggle-details").click({ force: true });
+		expect(await page.locator("#list").evaluate((list) => list.classList.contains("hide-details"))).toBe(true);
+		expect(await page.locator("#list .group-description").isVisible()).toBe(true);
+	});
+
+	it("is carried into the Markdown and the share link", async () => {
+		const { open } = await session();
+		const page = await open(linkFor(described));
+		await page.locator("#copy").click();
+		await page.locator("#copy.flash").waitFor();
+		const markdown = listMarkdown(await page.evaluate(() => navigator.clipboard.readText()));
+		expect(markdown).toBe(
+			[
+				"# Release",
+				"",
+				"## Prepare",
+				"",
+				"Before the window opens.",
+				"See https://example.com/runbook.",
+				"",
+				"- [ ] Review",
+				"- [ ] Bump",
+				"  Edit `package.json`.",
+				"",
+				"## Ship",
+				"",
+				"- [ ] Publish",
+			].join("\n") + "\n",
+		);
+		const shared = decodeLink(await shareLink(page));
+		expect(shared.sections[0].description).toBe("Before the window opens.\nSee https://example.com/runbook.");
+		expect(shared.sections[1]).not.toHaveProperty("description");
+	});
+
+	it("counts as a different version when an agent edits only a section description", async () => {
+		const { open } = await session();
+		const first = await open(linkFor(described));
+		await first.waitForURL(ID_URL);
+		const shared = decodeLink(await shareLink(first));
+		shared.sections[0].description = "Changed.";
+		const second = await open(linkFor(shared));
+		await second.waitForURL(ID_URL);
+		expect(second.url()).toBe(first.url());
+		expect(await second.locator("#notice").textContent()).toContain("different version");
+		await second.locator("#notice button").click();
+		expect(await second.locator("#list .group-description").textContent()).toBe("Changed.");
+	});
+
+	it("leaves the id of a list without section descriptions as it was", async () => {
+		const { open } = await session();
+		const list = { title: "Plain", sections: [{ title: "A", tasks: ["a"] }] };
+		const page = await open(linkFor(list));
+		await page.waitForURL(ID_URL);
+		const other = await open(linkFor({ ...list, sections: [{ title: "A", description: "  ", tasks: ["a"] }] }));
+		await other.waitForURL(ID_URL);
+		expect(other.url()).toBe(page.url());
+	});
+});
+
 describe("copying as Markdown", () => {
 	it("copies the list as it is now", async () => {
 		const { open } = await session();

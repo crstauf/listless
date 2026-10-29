@@ -186,10 +186,17 @@ To group tasks under headings, use "sections" instead of "tasks":
       "title": "Ship the release",
       "ordered": true,
       "sections": [
-        {"title": "Prepare", "ordered": true, "tasks": ["Review the PR", {"text": "Bump the version", "details": "Edit \`package.json\`."}]},
+        {"title": "Prepare", "description": "Do these before the release window opens.", "ordered": true, "tasks": ["Review the PR", {"text": "Bump the version", "details": "Edit \`package.json\`."}]},
         {"title": "Release", "ordered": true, "tasks": ["Merge to \`main\`", "Run \`npm publish\`"]}
       ]
     }
+
+A section can have a "description", shown under its heading. Use it for
+context that all of its tasks share, instead of repeating the same "details"
+on every task: the user reads it once, where it applies, and the link gets
+shorter too (most of all a plain "#json=" link, which isn't compressed). Like
+the list's description, it keeps line breaks and turns web addresses into
+links, and it is always shown (the user's "hide details" doesn't hide it).
 
 A section can also be "ordered": true, which means its tasks are done in
 sequence. The two are independent, so a list can mix them: sections that go in
@@ -213,8 +220,8 @@ Text is plain: Markdown and HTML are shown literally, with two exceptions:
 
 - \`backticks\` mark code. Wrap commands, file names, paths and identifiers
   in backticks; the user can select a code span with one click to copy it.
-- Web addresses (http:// or https://) in task text, details and the
-  description become links that open in a new tab. Write an address bare,
+- Web addresses (http:// or https://) in task text, details and
+  descriptions become links that open in a new tab. Write an address bare,
   not in backticks, when the user should be able to open it; in backticks it
   stays code, for copying.
 
@@ -228,7 +235,7 @@ click.
 - copy: at most ${LIMITS.maxCopyLength} characters per value, ${LIMITS.maxCopyValues} values per task, labels at most ${LIMITS.maxCopyLabelLength} characters
 - sections: 1 to ${LIMITS.maxSections}, each with a title and at least one task
 - titles (list and section): at most ${LIMITS.maxTitleLength} characters
-- description: at most ${LIMITS.maxDescriptionLength} characters
+- description (list and section): at most ${LIMITS.maxDescriptionLength} characters
 - POST body: at most ${LIMITS.maxBodyBytes / 1024} KB
 
 ## Giving the link to the user

@@ -53,8 +53,8 @@ The page shows progress overall and per section. Tasks in sections that aren't o
 - **`description`**: optional. It's shown under the title, which makes it a good place for a link back to the conversation the list came from.
 - **`ordered`**: optional. When `true`, things are done in sequence. In a list without sections, only the next unfinished task can be checked off, and the ones after it stay locked. With sections, each section stays locked until every section before it is done. Unchecking a step reopens it and everything after it.
 - **`tasks`**: an array of tasks. A task is a string, or `{ "text", "details", "copy", "done" }` when it needs extra explanation, a value to paste elsewhere, or is already complete. Details show in smaller, muted text, and the reader can hide them. `copy` is a value (an email address, an order number, a confirmation code) shown exactly as written in its own box, selected whole with one click, with a copy button beside it; it stays visible when details are hidden. For a step that needs several, make it an array of values, each with its own button, and give an item a short label when they could be confused: `"copy": [{ "label": "Name", "value": "_acme" }, "abc123"]`. Add `"done": true` to a task that is already complete and it starts out checked off (in an ordered list or section, done tasks must come first: see [Ordering](#ordering)).
-- **`sections`**: use this instead of `tasks` to group tasks under headings. A section can also set `"ordered": true` to have its own tasks done in sequence (see [Ordering](#ordering)).
-- **Text** is plain, with two exceptions: `` `backtick` `` spans show as code, and web addresses (`http://` or `https://`) in task text, details and the description become links. Only the checkbox toggles a task, so clicking text, code or a link never checks it off.
+- **`sections`**: use this instead of `tasks` to group tasks under headings. A section can also have a `"description"`, shown under its heading, for context its tasks share, read once where it applies instead of repeated in the `details` of each task (which also keeps plain `#json=` links short), and can set `"ordered": true` to have its own tasks done in sequence (see [Ordering](#ordering)).
+- **Text** is plain, with two exceptions: `` `backtick` `` spans show as code, and web addresses (`http://` or `https://`) in task text, details and descriptions become links. Only the checkbox toggles a task, so clicking text, code or a link never checks it off.
 
 ### Ordering
 
@@ -106,7 +106,7 @@ Limits:
 - Up to 500 tasks in total, and up to 50 sections.
 - Task text up to 1,000 characters, details up to 2,000, and a copy value up to 500 (up to 10 per task, labels up to 50).
 - List and section titles up to 200 characters.
-- Description up to 2,000 characters.
+- List and section descriptions up to 2,000 characters.
 - POST bodies up to 256 KB.
 
 ### Updating a list
