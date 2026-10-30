@@ -48,8 +48,11 @@ export function useBrowser() {
 	});
 
 	// Options are for the browser context: a colour scheme, a touch screen, a viewport.
+	// Animations are off unless a test asks for them with reducedMotion: "no-preference":
+	// Playwright waits for a moving element to settle before it clicks, which would
+	// make every test's timing depend on where an animation happens to be.
 	return async function session(options: BrowserContextOptions = {}): Promise<Session> {
-		const context = await browser.newContext({ viewport: { width: 800, height: 900 }, ...options });
+		const context = await browser.newContext({ viewport: { width: 800, height: 900 }, reducedMotion: "reduce", ...options });
 		contexts.push(context);
 		await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: ORIGIN });
 		await context.route(`${ORIGIN}/**`, (route) =>

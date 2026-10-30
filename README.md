@@ -156,29 +156,9 @@ To deploy to your own Cloudflare account:
 
 Or run `npx wrangler login && npm run deploy`. No KV namespaces or other resources are needed.
 
-## Development
+## Contributing
 
-```sh
-npm run build      # rebuild src/page.generated.ts from src/page/
-npm run typecheck
-npm test           # the Worker: headers, CSP, API
-npm run test:page  # the page, driven in Chromium (npx playwright install chromium, once)
-```
-
-The page source lives in `src/page/` (`page.html`, `page.css`, `page.js`). `npm run build` inlines the CSS and JS into the HTML, computes the SHA-256 hashes the Content-Security-Policy needs, and writes `src/page.generated.ts`. That file is committed so the deployed page can be reviewed in the repository. CI rebuilds it and fails if it differs. The build also copies the limits from [`src/limits.ts`](src/limits.ts), which the Worker uses too, into the page script before hashing it, so both enforce the same ones.
-
-The browser tests (`npm run test:page`) serve the built page to Chromium with the same Content-Security-Policy header the Worker sends, so they need no server.
-
-After changing how the page looks, run `npm run screenshots` to recapture the README preview (`docs/preview-light.png` and `docs/preview-dark.png`). It needs Playwright's Chromium, which you can install once with `npx playwright install chromium`. No server is needed.
-
-### Deploying from GitHub Actions
-
-Two workflows live in `.github/workflows/`. `check.yml` runs the checks (the generated page is up to date, typecheck, the Worker tests and the browser tests) on every pull request and has no access to secrets. `deploy.yml` runs on pushes to `master`: it calls `check.yml` first, then deploys. The deploy needs two repository (or `production` environment) secrets:
-
-- `CLOUDFLARE_API_TOKEN`: an API token with the **Workers Scripts: Edit** permission
-- `CLOUDFLARE_ACCOUNT_ID`
-
-[Dependabot](.github/dependabot.yml) opens a weekly pull request for updates to the Actions and the npm dependencies; the same checks run on it.
+How to build and test it, write new tests, and the deploy workflows are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
