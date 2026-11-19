@@ -15,13 +15,13 @@
     "test:page": "npm run build && vitest run -c vitest.page.config.ts"
   },
   "devDependencies": {
-    "@cloudflare/vitest-plugin": "1.6.1",
-    "@cloudflare/workers-types": "5.20261109.1",
+    "@cloudflare/vitest-plugin": "1.8.3",
+    "@cloudflare/workers-types": "5.20261116.1",
     "@types/node": "26.6.6",
-    "playwright": "1.65.0",
+    "playwright": "1.65.1",
     "typescript": "7.0.2",
     "vitest": "5.1.0",
-    "wrangler": "4.159.0"
+    "wrangler": "4.163.0"
   },
   "allowScripts": {
     "esbuild": true,
